@@ -1,6 +1,6 @@
 # PROGRESS.md
 
-## Status: M0 ✅ · M1 ✅ — building M2 (web viewer)
+## Status: M0 ✅ · M1 ✅ · M2 ✅ — building M3 (text input + occlusion fill)
 
 ### Decisions (resolved)
 - **Name:** AdamWorld (`adamworld` package/CLI, `@adamworld/web`).
@@ -19,8 +19,11 @@
   - Model registry loaders for SDXL-inpaint (diffusers) and Depth Anything V2 (transformers), lazy + offload/tiling.
   - Gates green: ruff ✓ mypy ✓ pytest **19** ✓ (incl. geometry + smoke e2e + API). CLI image→world verified.
 
-### Next — M2 (web viewer)
-- Load a generated world's `.ply`/`.spz` in the browser via **Spark** `SplatMesh`; WASD/mouse + touch nav; WebXR; loading progress. Verify by driving a headless browser (Playwright) to load a mock-generated world and screenshot. Confirm Spark's current npm version/API first.
+- **M2 Web viewer:** Spark **v2.3.1** (`@sparkjsdev/spark`, verified) + three r0.180. `web/src/main.ts` loads a world's `.spz`/`.ply` via `SplatMesh` + `SparkRenderer`; `controls.ts` = WASD/arrows + mouse/touch drag-look + Space/C + Shift-sprint; WebXR via `VRButton`; loading progress bar; `?world=<id>` (API) or `?src=<url>` (direct). **Verified in a headless browser (Playwright):** loaded a generated world's PLY, no load errors, splats render (see `adamworld-m2-viewer.png`). Viewer needs no GPU.
+
+### Next — M3 (text input + occlusion fill)
+- Stage 1 FLUX.1-schnell (Apache) text→seed image (fp8 + sequential offload on T4).
+- Stage 5 occlusion fill: render novel views → detect holes → SDXL-inpaint → depth → lift → add Gaussians → refit (LucidDreamer loop, clean-room on gsplat). CPU-testable parts: novel-view hole detection + splat merge; model calls on T4.
 
 ### Known issues / notes
 - Global `%TEMP%\pytest-of-*` is permission-locked on this PC; `conftest.py` redirects temp root to project-local `.pytest_tmp`.

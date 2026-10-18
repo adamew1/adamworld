@@ -12,6 +12,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@sparkjsdev/spark": "^2.3.1",
     "three": "^0.180.0"
   },
   "devDependencies": {
