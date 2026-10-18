@@ -1,0 +1,25 @@
+{
+  "name": "@adamworld/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AdamWorld web viewer and layout editor (three.js + Spark).",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@types/three": "^0.180.0",
+    "eslint": "^9.13.0",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.12.2",
+    "vite": "^5.4.10"
+  }
+}

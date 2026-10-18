@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdamWorld</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0d12; color: #e7eaf0;
+        font-family: system-ui, sans-serif; }
+      #app { position: fixed; inset: 0; }
+      #hud { position: fixed; top: 12px; left: 12px; font-size: 13px; opacity: 0.8; }
+      #progress { position: fixed; bottom: 0; left: 0; height: 3px; width: 0;
+        background: #6ea8fe; transition: width 0.2s; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud">AdamWorld viewer</div>
+    <div id="progress"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

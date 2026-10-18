@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adamworld"
+version = "0.1.0.dev0"
+description = "Turn a prompt or image into a persistent, explorable, editable 3D world. An open alternative to tools like Marble."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "The AdamWorld Authors" }]
+keywords = ["gaussian-splatting", "3d-generation", "world-model", "diffusion", "nerf"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
+
+# Light, CPU-only runtime deps. Heavy model/GPU deps live in the [gpu] extra so
+# the core installs and the full test suite runs on a laptop with no GPU.
+dependencies = [
+    "numpy==2.1.3",
+    "pillow==11.0.0",
+    "pydantic==2.9.2",
+    "typer==0.12.5",
+    "click==8.1.7",  # pin: typer 0.12.5 is incompatible with click >=8.2 secondary-flag handling
+    "rich==13.9.3",
+    "platformdirs==4.3.6",
+    "fastapi==0.115.4",
+    "uvicorn==0.32.0",
+    "python-multipart==0.0.12",
+]
+
+[project.optional-dependencies]
+# Installed only on a CUDA machine (Kaggle/Colab/rented). Not used in CI.
+gpu = [
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "diffusers==0.31.0",
+    "transformers==4.46.2",
+    "accelerate==1.1.1",
+    "safetensors==0.4.5",
+    "huggingface-hub==0.26.2",
+    "gsplat==1.4.0",
+    "opencv-python-headless==4.10.0.84",
+    "scipy==1.14.1",
+    "open3d==0.18.0",
+    "trimesh==4.5.2",
+]
+dev = [
+    "pytest==8.3.3",
+    "ruff==0.7.2",
+    "mypy==1.13.0",
+    "httpx==0.27.2",
+]
+
+[project.scripts]
+adamworld = "adamworld.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["adamworld*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W", "C4"]
+ignore = ["B008"]  # typer uses function-call defaults (Option/Argument)
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["adamworld.stages.*"]
+# stages import optional GPU deps lazily inside functions
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

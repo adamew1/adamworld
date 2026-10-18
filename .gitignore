@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.pytest_tmp/
+.coverage
+htmlcov/
+
+# Node / web
+node_modules/
+web/dist/
+*.tsbuildinfo
+
+# Model weights & caches (never commit — downloaded on first use)
+weights/
+*.safetensors
+*.ckpt
+*.pth
+.cache/
+.adamworld_cache/
+
+# Generated worlds & large assets (never commit)
+worlds/
+*.ply
+*.spz
+*.glb
+*.splat
+*.ksplat
+!tests/**/fixtures/**
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

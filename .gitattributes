@@ -1,0 +1,13 @@
+# Normalize line endings to LF in the repo (consistent across OS + Linux CI).
+* text=auto eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ply binary
+*.spz binary
+*.glb binary
+*.splat binary
+*.ksplat binary
+*.npy binary
