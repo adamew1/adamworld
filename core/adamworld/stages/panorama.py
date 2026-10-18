@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from adamworld.imaging import load_rgb, resize, save_rgb, seeded_rng
+from adamworld.imaging import load_rgb, save_rgb, seeded_rng
 from adamworld.stages.base import Stage, StageContext
 from adamworld.types import ImageRef, PanoramaRef
 
@@ -69,14 +69,15 @@ class PanoramaStage(Stage):
             else:
                 t = (v - 0.5) / 0.5
                 arr[row, :] = horizon * (1 - t) + ground * t
-        # Place the input image as the front-facing view (centered band).
+        # Project the input image onto the front view using the real equirect
+        # geometry (same code path the SDXL backend conditions on).
         if image is not None:
-            src = load_rgb(image.path)
-            bw, bh = max(1, w // 4), max(1, h // 2)
-            band = resize(src, bw, bh).astype(np.float32)
-            x0 = w // 2 - bw // 2
-            y0 = int(h * 0.30)
-            arr[y0 : y0 + bh, x0 : x0 + bw] = band
+            from adamworld import geometry  # noqa: PLC0415
+
+            seed = load_rgb(image.path)
+            canvas, known = geometry.place_image_front(seed, h, w, fov_deg=90.0)
+            m = known[..., None]
+            arr = arr * (1 - m) + canvas.astype(np.float32) * m
         return np.clip(arr, 0, 255).astype(np.uint8)
 
     def _sdxl_outpaint(
@@ -87,8 +88,37 @@ class PanoramaStage(Stage):
         h: int,
         ctx: StageContext,
     ) -> np.ndarray:
-        # M1: project seed image onto an equirect canvas, then SDXL-inpaint the
-        # rest with horizontal circular padding + circular VAE blending for a
-        # seamless 360 wrap. (flux-pano backend uses DiT360 / FLUX.1-dev, NC.)
-        ctx.get_registry().sdxl_inpaint()
-        raise NotImplementedError("Real panorama (SDXL outpaint) lands in M1.")
+        """Project the seed image onto an equirect canvas, then SDXL-inpaint the
+        rest. Horizontal circular padding makes the left/right edges wrap
+        seamlessly. (The ``flux-pano`` backend swaps in DiT360 / FLUX.1-dev, NC.)
+        """
+        from PIL import Image  # noqa: PLC0415
+
+        from adamworld import geometry  # noqa: PLC0415
+
+        if image is not None:
+            seed = load_rgb(image.path)
+            canvas, known = geometry.place_image_front(seed, h, w, fov_deg=90.0)
+        else:
+            canvas = self._mock(None, prompt, w, h, ctx)  # gradient seed
+            known = np.zeros((h, w), np.float32)
+
+        # diffusers inpaint convention: white (255) = fill, black = keep.
+        inpaint_mask = ((known < 0.5) * 255).astype(np.uint8)
+
+        pad = w // 8
+        canvas_p = geometry.horizontal_wrap_pad(canvas, pad)
+        mask_p = geometry.horizontal_wrap_pad(inpaint_mask[..., None], pad)[..., 0]
+
+        pipe = ctx.get_registry().sdxl_inpaint()
+        result = pipe(
+            prompt=(prompt or "a seamless 360 degree equirectangular panorama") + ", 360 panorama",
+            image=Image.fromarray(canvas_p),
+            mask_image=Image.fromarray(mask_p),
+            width=canvas_p.shape[1],
+            height=canvas_p.shape[0],
+            num_inference_steps=30,
+            guidance_scale=7.0,
+        )
+        out = np.asarray(result.images[0].convert("RGB"), dtype=np.uint8)
+        return out[:, pad : pad + w]  # crop the circular padding back off

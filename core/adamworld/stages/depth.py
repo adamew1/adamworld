@@ -12,10 +12,12 @@ from pathlib import Path
 
 import numpy as np
 
+from adamworld.imaging import load_rgb
 from adamworld.stages.base import Stage, StageContext
 from adamworld.types import DepthRef, PanoramaRef
 
 EYE_HEIGHT = 1.6
+NEAR = 0.3
 FAR = 30.0
 
 
@@ -58,6 +60,31 @@ class DepthStage(Stage):
         return np.repeat(depth_rows[:, None], w, axis=1).astype(np.float32)
 
     def _depth_anything(self, panorama: PanoramaRef, ctx: StageContext) -> np.ndarray:
-        # M1: tangent-plane projection -> Depth Anything V2 per crop -> fuse.
-        ctx.get_registry().depth_anything("large")
-        raise NotImplementedError("Real depth (Depth Anything V2) lands in M1.")
+        """Tangent-plane projection -> Depth Anything V2 per crop -> fuse to equirect.
+
+        Depth Anything V2 expects perspective images, so we render overlapping
+        tangent views of the panorama (a horizon ring + up/down), estimate each,
+        normalize, and splat back with cosine-feathered blending. The model
+        returns normalized disparity (near=bright); we invert it to a radial
+        depth in [NEAR, FAR]. Scale is relative — the metric scale is recorded
+        per-world in world.json.
+        """
+        from PIL import Image  # noqa: PLC0415
+
+        from adamworld import geometry  # noqa: PLC0415
+
+        equirect = load_rgb(panorama.path)
+        h, w = panorama.height, panorama.width
+        pipe = ctx.get_registry().depth_anything("large")
+        patch = 384
+        accum = np.zeros((h, w), np.float32)
+        weight = np.zeros((h, w), np.float32)
+        for lon0, lat0 in geometry.ring_centers(8):
+            crop = geometry.equirect_to_perspective(equirect, lon0, lat0, 90.0, patch)
+            out = pipe(Image.fromarray(crop.astype(np.uint8)))
+            disp = np.asarray(out["depth"], dtype=np.float32)
+            disp = (disp - disp.min()) / (disp.max() - disp.min() + 1e-6)  # near=1
+            geometry.perspective_to_equirect_accumulate(disp, lon0, lat0, 90.0, h, w, accum, weight)
+        disp_eq = accum / np.maximum(weight, 1e-6)
+        depth = NEAR + (1.0 - disp_eq) * (FAR - NEAR)
+        return depth.astype(np.float32)

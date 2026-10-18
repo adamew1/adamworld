@@ -61,15 +61,52 @@ class ModelRegistry:
         except Exception:
             pass
 
-    # --- loaders (wired up in M1 / M3) ------------------------------------
+    def _torch_dtype(self) -> Any:  # noqa: ANN401
+        import torch  # noqa: PLC0415
+
+        return torch.float16 if self.settings.dtype == "float16" else torch.float32
+
+    # --- loaders ----------------------------------------------------------
     def flux_schnell(self) -> Any:  # noqa: ANN401 - diffusers pipeline
         _require_gpu_deps("FLUX.1-schnell (stage 1 default)")
         raise NotImplementedError("FLUX.1-schnell loader lands in M3 (text input).")
 
     def sdxl_inpaint(self) -> Any:  # noqa: ANN401
+        """SDXL inpainting pipeline (OpenRAIL++). Runs on a T4 with offload/tiling."""
         _require_gpu_deps("SDXL inpaint (stages 2/5/8 default)")
-        raise NotImplementedError("SDXL inpaint loader lands in M1 (panorama).")
+        if "sdxl_inpaint" in self._loaded:
+            return self._loaded["sdxl_inpaint"]
+        from diffusers import AutoPipelineForInpainting  # noqa: PLC0415
+
+        pipe = AutoPipelineForInpainting.from_pretrained(
+            SDXL_INPAINT_REPO,
+            torch_dtype=self._torch_dtype(),
+            variant="fp16",
+            cache_dir=self.weights_path(),
+        )
+        if self.settings.offload:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to("cuda")
+        pipe.enable_vae_tiling()
+        pipe.set_progress_bar_config(disable=True)
+        self._loaded["sdxl_inpaint"] = pipe
+        return pipe
 
     def depth_anything(self, size: str = "large") -> Any:  # noqa: ANN401
+        """Depth Anything V2 (Apache-2.0) depth-estimation pipeline."""
         _require_gpu_deps("Depth Anything V2 (stage 3 default)")
-        raise NotImplementedError("Depth Anything V2 loader lands in M1 (depth).")
+        key = f"depth_anything_{size}"
+        if key in self._loaded:
+            return self._loaded[key]
+        import torch  # noqa: PLC0415
+        from transformers import pipeline  # noqa: PLC0415
+
+        pipe = pipeline(
+            task="depth-estimation",
+            model=DEPTH_ANYTHING_V2[size],
+            device=0 if torch.cuda.is_available() else -1,
+            torch_dtype=self._torch_dtype(),
+        )
+        self._loaded[key] = pipe
+        return pipe
