@@ -27,6 +27,7 @@ weights/
 *.pth
 .cache/
 .adamworld_cache/
+.kaggle_run/
 
 # Generated worlds & large assets (never commit)
 worlds/

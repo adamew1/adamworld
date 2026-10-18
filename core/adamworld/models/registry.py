@@ -68,8 +68,27 @@ class ModelRegistry:
 
     # --- loaders ----------------------------------------------------------
     def flux_schnell(self) -> Any:  # noqa: ANN401 - diffusers pipeline
+        """FLUX.1-schnell (Apache-2.0), bf16 + sequential CPU offload to fit a T4."""
         _require_gpu_deps("FLUX.1-schnell (stage 1 default)")
-        raise NotImplementedError("FLUX.1-schnell loader lands in M3 (text input).")
+        if "flux_schnell" in self._loaded:
+            return self._loaded["flux_schnell"]
+        import torch  # noqa: PLC0415
+        from diffusers import FluxPipeline  # noqa: PLC0415
+
+        pipe = FluxPipeline.from_pretrained(
+            FLUX_SCHNELL_REPO,
+            torch_dtype=torch.bfloat16,  # FLUX is trained/released in bf16
+            cache_dir=self.weights_path(),
+        )
+        # 12B params: sequential CPU offload is required on 16 GB; otherwise .to(cuda).
+        if self.settings.offload:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to("cuda")
+        pipe.vae.enable_tiling()
+        pipe.set_progress_bar_config(disable=True)
+        self._loaded["flux_schnell"] = pipe
+        return pipe
 
     def sdxl_inpaint(self) -> Any:  # noqa: ANN401
         """SDXL inpainting pipeline (OpenRAIL++). Runs on a T4 with offload/tiling."""

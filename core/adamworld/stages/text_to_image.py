@@ -51,6 +51,19 @@ class TextToImageStage(Stage):
         return np.clip(img, 0, 255).astype(np.uint8)
 
     def _flux(self, prompt: str, ctx: StageContext) -> np.ndarray:
-        # Implemented in M3 using the FLUX.1-schnell pipeline (fp8 + offload on T4).
-        ctx.get_registry().flux_schnell()
-        raise NotImplementedError("Real text->image (FLUX.1-schnell) lands in M3.")
+        """FLUX.1-schnell: 4-step distilled, guidance 0. Square seed image."""
+        import torch  # noqa: PLC0415
+
+        pipe = ctx.get_registry().flux_schnell()
+        r = min(max(256, ctx.resolution), 1024)
+        r = (r // 16) * 16  # FLUX needs multiples of 16
+        gen = torch.Generator(device="cpu").manual_seed(ctx.seed)
+        out = pipe(
+            prompt,
+            num_inference_steps=4,
+            guidance_scale=0.0,
+            height=r,
+            width=r,
+            generator=gen,
+        )
+        return np.asarray(out.images[0].convert("RGB"), dtype=np.uint8)
