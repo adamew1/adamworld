@@ -167,6 +167,34 @@ def place_image_front(
     return np.clip(canvas, 0, 255).astype(np.uint8), mask
 
 
+def perspective_unproject(
+    depth: np.ndarray,  # (S, S) radial depth
+    colors: np.ndarray,  # (S, S, 3)
+    fov_deg: float,
+    cam_pos: np.ndarray,  # (3,)
+    look_lonlat: tuple[float, float],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Unproject a perspective depth+color view at ``cam_pos`` into world points."""
+    size = depth.shape[0]
+    rays = perspective_rays(look_lonlat[0], look_lonlat[1], fov_deg, size)
+    pts = np.asarray(cam_pos, np.float32)[None, None, :] + rays * depth[..., None]
+    return pts.reshape(-1, 3).astype(np.float32), colors.reshape(-1, 3).astype(np.float32)
+
+
+def fit_scale_shift(
+    src: np.ndarray, ref: np.ndarray, mask: np.ndarray
+) -> tuple[np.ndarray, float, float]:
+    """Least-squares a,b so a*src+b ~= ref over ``mask``. Aligns inpainted-view
+    depth to the rendered depth of existing geometry before lifting new pixels."""
+    s = src[mask].ravel().astype(np.float64)
+    r = ref[mask].ravel().astype(np.float64)
+    if s.size < 2:
+        return src.astype(np.float32), 1.0, 0.0
+    a_mat = np.stack([s, np.ones_like(s)], axis=1)
+    (a, b), *_ = np.linalg.lstsq(a_mat, r, rcond=None)
+    return (a * src + b).astype(np.float32), float(a), float(b)
+
+
 def horizontal_wrap_pad(img: np.ndarray, pad: int) -> np.ndarray:
     """Circular-pad left/right by ``pad`` columns (seam-free 360 denoising)."""
     if pad <= 0:

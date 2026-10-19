@@ -27,6 +27,7 @@ from adamworld.splat import GaussianCloud
 from adamworld.stages.base import Stage, StageContext
 from adamworld.stages.depth import DepthStage
 from adamworld.stages.lift import LiftStage
+from adamworld.stages.occlusion import OcclusionStage
 from adamworld.stages.panorama import PanoramaStage
 from adamworld.stages.text_to_image import TextToImageStage
 from adamworld.types import DepthRef, GenerationRequest, ImageRef, PanoramaRef, SplatRef
@@ -169,17 +170,34 @@ class Pipeline:
         )
         model_versions["lift"] = lift_stage.model_version(ctx)
 
+        # --- stage 5: fill occlusions (GPU backends only) ------------------
+        final_splats = splats
+        if ctx.backend != "mock":
+            self._emit("occlusion", 0.82)
+            occ = OcclusionStage()
+            final_splats = self._run_stage(
+                occ,
+                ctx,
+                inputs=splats,
+                out_cls=SplatRef,
+                extra={},
+                runner=lambda prefix: occ.run(
+                    ctx, splats=splats, panorama=panorama, out_prefix=prefix
+                ),
+            )
+            model_versions["occlusion"] = occ.model_version(ctx)
+
         # --- finalize world ------------------------------------------------
         self._emit("finalize", 0.92)
-        shutil.copyfile(splats.path, world.splats_ply)
+        shutil.copyfile(final_splats.path, world.splats_ply)
         GaussianCloud.load_ply(world.splats_ply).save_spz(world.splats_spz)  # primary, Spark-native
         pano_rgb = load_rgb(panorama.path)
         save_thumbnail(world.thumbnail, pano_rgb)
 
         meta = world.meta()
         meta.model_versions = model_versions
-        meta.bounds.aabb_min = splats.aabb_min
-        meta.bounds.aabb_max = splats.aabb_max
+        meta.bounds.aabb_min = final_splats.aabb_min
+        meta.bounds.aabb_max = final_splats.aabb_max
         world.save_meta(meta)
         self._emit("done", 1.0)
         return world
