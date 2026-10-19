@@ -45,7 +45,11 @@ def _seed_image(path: Path) -> None:
 # sys.path install (no build step), deps, and the common imports.
 _PRELUDE = r"""
 import os, glob, sys, subprocess, zipfile
-os.environ['ADAMWORLD_CACHE'] = '/kaggle/working/.adamworld_cache'
+# Keep model weights OUT of /kaggle/working so the kernel output (and its download)
+# stays tiny — only world.zip / the log come back.
+os.environ['ADAMWORLD_CACHE'] = '/tmp/.adamworld_cache'
+os.environ['HF_HOME'] = '/tmp/hf'
+os.environ['HUGGINGFACE_HUB_CACHE'] = '/tmp/hf'
 for r in glob.glob('/kaggle/input/*'):
     print('input:', r, '->', os.listdir(r)[:8], flush=True)
 for z in glob.glob('/kaggle/input/**/*.zip', recursive=True):
@@ -171,6 +175,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["image", "text", "bench", "full"], default="image")
     ap.add_argument("--poll", type=int, default=30, help="status poll interval (s)")
+    ap.add_argument("--skip-dataset", action="store_true", help="reuse the existing dataset")
+    ap.add_argument("--no-wait", action="store_true", help="push the kernel and exit (poll later)")
     args = ap.parse_args()
 
     from kaggle.api.kaggle_api_extended import KaggleApi
@@ -182,36 +188,39 @@ def main() -> None:
     print("Kaggle user:", user)
 
     # --- 1. dataset (core/ + seed image) ---
-    ds_dir = STAGE / "dataset"
-    if ds_dir.exists():
-        shutil.rmtree(ds_dir)
-    shutil.copytree(REPO / "core", ds_dir / "core", ignore=shutil.ignore_patterns(
-        "__pycache__", "*.pyc", ".pytest_tmp", "*.egg-info", "build", "dist"))
-    _seed_image(ds_dir / "seed.png")
-    (ds_dir / "dataset-metadata.json").write_text(json.dumps({
-        "title": "adamworld-core",
-        "id": f"{user}/{DATASET_SLUG}",
-        "licenses": [{"name": "Apache 2.0"}],
-    }, indent=2))
+    if not args.skip_dataset:
+        ds_dir = STAGE / "dataset"
+        if ds_dir.exists():
+            shutil.rmtree(ds_dir)
+        shutil.copytree(REPO / "core", ds_dir / "core", ignore=shutil.ignore_patterns(
+            "__pycache__", "*.pyc", ".pytest_tmp", "*.egg-info", "build", "dist"))
+        _seed_image(ds_dir / "seed.png")
+        (ds_dir / "dataset-metadata.json").write_text(json.dumps({
+            "title": "adamworld-core",
+            "id": f"{user}/{DATASET_SLUG}",
+            "licenses": [{"name": "Apache 2.0"}],
+        }, indent=2))
 
-    try:
-        api.dataset_status(f"{user}/{DATASET_SLUG}")
-        print("updating existing dataset ...")
-        api.dataset_create_version(str(ds_dir), version_notes="update", dir_mode="zip")
-    except Exception:
-        print("creating dataset ...")
-        api.dataset_create_new(str(ds_dir), dir_mode="zip")
-
-    # Wait until the dataset finishes processing so the kernel can mount it.
-    for _ in range(20):
-        time.sleep(args.poll)
         try:
-            st = str(api.dataset_status(f"{user}/{DATASET_SLUG}"))
-            print("dataset status:", st, flush=True)
-            if "ready" in st.lower():
-                break
-        except Exception as exc:
-            print("dataset not ready yet:", exc, flush=True)
+            api.dataset_status(f"{user}/{DATASET_SLUG}")
+            print("updating existing dataset ...")
+            api.dataset_create_version(str(ds_dir), version_notes="update", dir_mode="zip")
+        except Exception:
+            print("creating dataset ...")
+            api.dataset_create_new(str(ds_dir), dir_mode="zip")
+
+        # Wait until the dataset finishes processing so the kernel can mount it.
+        for _ in range(20):
+            time.sleep(args.poll)
+            try:
+                st = str(api.dataset_status(f"{user}/{DATASET_SLUG}"))
+                print("dataset status:", st, flush=True)
+                if "ready" in st.lower():
+                    break
+            except Exception as exc:
+                print("dataset not ready yet:", exc, flush=True)
+    else:
+        print("skipping dataset upload (reusing existing)", flush=True)
 
     # --- 2. kernel ---
     k_dir = STAGE / "kernel"
@@ -236,6 +245,9 @@ def main() -> None:
     }, indent=2))
     print("pushing kernel ...")
     api.kernels_push(str(k_dir))
+    if args.no_wait:
+        print("pushed; exiting (poll with --mode poll or kernels_status).", flush=True)
+        return
 
     # --- 3. poll + fetch ---
     kref = f"{user}/{KERNEL_SLUG}"
