@@ -40,6 +40,7 @@ def generate(
     allow_noncommercial: bool = typer.Option(
         False, "--allow-noncommercial", help="Opt into non-commercial models (DAv2 L, FLUX NC)."
     ),
+    text_model: str = typer.Option("sdxl", "--text-model", help="Stage-1 model: sdxl | flux."),
 ) -> None:
     if layout is not None:
         from adamworld.world.schema import Layout
@@ -64,7 +65,9 @@ def generate(
         backend=backend,
     )
     profiler = Profiler()
-    settings = Settings(offload=offload, allow_noncommercial=allow_noncommercial)
+    settings = Settings(
+        offload=offload, allow_noncommercial=allow_noncommercial, text_model=text_model
+    )
 
     def _progress(stage: str, frac: float) -> None:
         console.print(f"[dim]{frac * 100:5.1f}%[/dim] {stage}")

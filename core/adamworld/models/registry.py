@@ -70,6 +70,29 @@ class ModelRegistry:
         return torch.float16 if self.settings.dtype == "float16" else torch.float32
 
     # --- loaders ----------------------------------------------------------
+    def sdxl_text(self) -> Any:  # noqa: ANN401
+        """SDXL base text-to-image (OpenRAIL++-M). The default stage-1 model on a T4."""
+        _require_gpu_deps("SDXL text-to-image (stage 1 default)")
+        if "sdxl_text" in self._loaded:
+            return self._loaded["sdxl_text"]
+        from diffusers import StableDiffusionXLPipeline  # noqa: PLC0415
+
+        pipe = StableDiffusionXLPipeline.from_pretrained(
+            SDXL_BASE_REPO,
+            torch_dtype=self._torch_dtype(),
+            variant="fp16",
+            use_safetensors=True,
+            cache_dir=self.weights_path(),
+        )
+        if self.settings.offload:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to("cuda")
+        pipe.enable_vae_tiling()
+        pipe.set_progress_bar_config(disable=True)
+        self._loaded["sdxl_text"] = pipe
+        return pipe
+
     def flux_schnell(self) -> Any:  # noqa: ANN401 - diffusers pipeline
         """FLUX.1-schnell (Apache-2.0), bf16 + sequential CPU offload to fit a T4."""
         _require_gpu_deps("FLUX.1-schnell (stage 1 default)")

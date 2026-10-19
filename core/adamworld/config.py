@@ -54,6 +54,9 @@ class Settings(BaseModel):
     # CC-BY-NC-4.0, FLUX.1-dev pano backends). Default-off keeps the pipeline
     # Apache/OpenRAIL-only. See docs/LICENSES.md.
     allow_noncommercial: bool = False
+    # Stage 1 text->image model. Default "sdxl" (OpenRAIL, ~7 GB, fast on a T4);
+    # "flux" opts into FLUX.1-schnell (Apache, 12B, needs quantization/offload).
+    text_model: str = "sdxl"
 
     @property
     def weights_dir(self) -> Path:

@@ -1,8 +1,9 @@
 """Stage 1 — Text → seed image.
 
-Default backend: FLUX.1-schnell (Apache-2.0), wired up in M3. ``mock`` backend
-produces a deterministic placeholder from the prompt+seed so the pipeline runs on
-CPU with no model.
+Default model: **SDXL base** (OpenRAIL++-M) — ~7 GB, fast on a T4. ``text_model
+= "flux"`` opts into FLUX.1-schnell (Apache-2.0, 12B, needs quantization/offload).
+``mock`` backend produces a deterministic placeholder from the prompt+seed so the
+pipeline runs on CPU with no model.
 """
 
 from __future__ import annotations
@@ -23,14 +24,18 @@ class TextToImageStage(Stage):
     def run(self, ctx: StageContext, *, prompt: str, out_prefix: Path) -> ImageRef:
         if ctx.backend == "mock":
             arr = self._mock(prompt, ctx)
-        else:
+        elif ctx.settings.text_model == "flux":
             arr = self._flux(prompt, ctx)
+        else:
+            arr = self._sdxl(prompt, ctx)
         path = out_prefix.with_suffix(".png")
         save_rgb(path, arr)
         return ImageRef(path=path, width=int(arr.shape[1]), height=int(arr.shape[0]))
 
     def model_version(self, ctx: StageContext) -> str:
-        return "mock-t2i@1" if ctx.backend == "mock" else "flux.1-schnell"
+        if ctx.backend == "mock":
+            return "mock-t2i@1"
+        return "flux.1-schnell" if ctx.settings.text_model == "flux" else "sdxl-base(OpenRAIL)"
 
     # --- backends ----------------------------------------------------------
     def _mock(self, prompt: str, ctx: StageContext) -> np.ndarray:
@@ -50,8 +55,19 @@ class TextToImageStage(Stage):
             img = img * (1 - m) + color[None, None, :] * m
         return np.clip(img, 0, 255).astype(np.uint8)
 
+    def _sdxl(self, prompt: str, ctx: StageContext) -> np.ndarray:
+        """SDXL base text-to-image (default). Square seed image."""
+        import torch  # noqa: PLC0415
+
+        pipe = ctx.get_registry().sdxl_text()
+        r = min(max(512, ctx.resolution), 1024)
+        r = (r // 8) * 8
+        gen = torch.Generator(device="cpu").manual_seed(ctx.seed)
+        out = pipe(prompt, num_inference_steps=25, height=r, width=r, generator=gen)
+        return np.asarray(out.images[0].convert("RGB"), dtype=np.uint8)
+
     def _flux(self, prompt: str, ctx: StageContext) -> np.ndarray:
-        """FLUX.1-schnell: 4-step distilled, guidance 0. Square seed image."""
+        """FLUX.1-schnell (opt-in): 4-step distilled, guidance 0. Square seed image."""
         import torch  # noqa: PLC0415
 
         pipe = ctx.get_registry().flux_schnell()

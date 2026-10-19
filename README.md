@@ -86,7 +86,7 @@ Apache-2.0 and OpenRAIL(++) models; every non-commercial model is gated behind
 
 | Stage | Default model | License |
 |-------|---------------|---------|
-| Text → image | FLUX.1-schnell | **apache-2.0** |
+| Text → image | **SDXL base** (default) · FLUX.1-schnell (`--text-model flux`) | OpenRAIL++-M · apache-2.0 |
 | Image → 360° pano / inpaint | SDXL-inpaint (+ SDXL base) | OpenRAIL++-M (flagged default) |
 | Depth | **Depth Anything V2 Small** | **apache-2.0** |
 | Lift / render / refit | gsplat | **Apache-2.0** |
