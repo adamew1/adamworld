@@ -19,11 +19,14 @@ from adamworld.config import Settings
 FLUX_SCHNELL_REPO = "black-forest-labs/FLUX.1-schnell"  # Apache-2.0
 SDXL_BASE_REPO = "stabilityai/stable-diffusion-xl-base-1.0"  # OpenRAIL++ (flagged default)
 SDXL_INPAINT_REPO = "diffusers/stable-diffusion-xl-1.0-inpainting-0.1"  # OpenRAIL++
-DEPTH_ANYTHING_V2 = {  # Apache-2.0 (S/B/L)
+# Depth Anything V2: ONLY Small is Apache-2.0; Base/Large/Giant are CC-BY-NC-4.0.
+DEPTH_ANYTHING_V2 = {
     "small": "depth-anything/Depth-Anything-V2-Small-hf",
     "base": "depth-anything/Depth-Anything-V2-Base-hf",
     "large": "depth-anything/Depth-Anything-V2-Large-hf",
+    "giant": "depth-anything/Depth-Anything-V2-Giant-hf",
 }
+DEPTH_ANYTHING_APACHE = {"small"}  # the rest require allow_noncommercial
 
 
 def _require_gpu_deps(what: str) -> None:
@@ -112,8 +115,20 @@ class ModelRegistry:
         self._loaded["sdxl_inpaint"] = pipe
         return pipe
 
-    def depth_anything(self, size: str = "large") -> Any:  # noqa: ANN401
-        """Depth Anything V2 (Apache-2.0) depth-estimation pipeline."""
+    def depth_anything(self, size: str = "small") -> Any:  # noqa: ANN401
+        """Depth Anything V2 depth-estimation pipeline.
+
+        Default ``small`` is Apache-2.0. ``base``/``large``/``giant`` are
+        CC-BY-NC-4.0 and require ``settings.allow_noncommercial=True``.
+        """
+        if size not in DEPTH_ANYTHING_V2:
+            raise ValueError(f"unknown Depth Anything size '{size}'")
+        if size not in DEPTH_ANYTHING_APACHE and not self.settings.allow_noncommercial:
+            raise PermissionError(
+                f"Depth Anything V2 '{size}' is CC-BY-NC-4.0 (non-commercial). "
+                f"Default is 'small' (Apache-2.0). To use it, pass --allow-noncommercial "
+                f"(or Settings(allow_noncommercial=True)). See docs/LICENSES.md."
+            )
         _require_gpu_deps("Depth Anything V2 (stage 3 default)")
         key = f"depth_anything_{size}"
         if key in self._loaded:

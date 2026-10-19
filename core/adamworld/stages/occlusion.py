@@ -48,7 +48,9 @@ class OcclusionStage(Stage):
 
         cloud = GaussianCloud.load_ply(splats.path)
         inpaint = ctx.get_registry().sdxl_inpaint()
-        depth_pipe = ctx.get_registry().depth_anything("base")
+        depth_pipe = ctx.get_registry().depth_anything(
+            "large" if ctx.settings.allow_noncommercial else "small"
+        )
         ang = np.radians(_FOV) / _SIZE
 
         for _ in range(iterations):

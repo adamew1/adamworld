@@ -78,22 +78,23 @@ adamworld serve                            # API on :8000; web editor at /editor
 
 ## Models & licenses
 
-Default pipeline is Apache-2.0-compatible. The one non-Apache default is the
-SDXL-class panorama/inpaint generator (OpenRAIL: commercial-ok, use-restricted);
-higher-quality FLUX options are non-commercial and ship only behind a flag. Full
-detail in `docs/LICENSES.md`.
+**The code is Apache-2.0. Models are downloaded at runtime and remain under their
+own licenses** — AdamWorld redistributes no weights. The default pipeline uses only
+Apache-2.0 and OpenRAIL(++) models; every non-commercial model is gated behind
+`--allow-noncommercial` and never runs by default. Exact per-model licenses
+(verified) are in `docs/LICENSES.md`.
 
 | Stage | Default model | License |
 |-------|---------------|---------|
-| Text → image | FLUX.1-schnell | **Apache-2.0** |
-| Image → 360° pano / inpaint | SDXL + SDXL-inpaint | OpenRAIL++ (flagged) |
-| Depth | Depth Anything V2 (Large) | **Apache-2.0** |
+| Text → image | FLUX.1-schnell | **apache-2.0** |
+| Image → 360° pano / inpaint | SDXL-inpaint (+ SDXL base) | OpenRAIL++-M (flagged default) |
+| Depth | **Depth Anything V2 Small** | **apache-2.0** |
 | Lift / render / refit | gsplat | **Apache-2.0** |
 | Mesh | TSDF/grid + our GLB writer | **MIT/Apache** |
-| Layout conditioning | ControlNet-depth (SDXL) | Apache/OpenRAIL |
+| Layout conditioning | ControlNet-depth-sdxl | openrail++ |
 | Viewer | Spark + three.js | **MIT** |
 | Splat file | SPZ (ours, Niantic format) / PLY | **MIT** |
-| — optional NC backends — | DiT360/Gimbal360 (FLUX.1-dev), UniDepth, Depth Pro | non-commercial |
+| opt-in (`--allow-noncommercial`) | DAv2 Base/Large/Giant (CC-BY-NC), FLUX.1-dev DiT360/Gimbal360, UniDepth, Depth Pro | non-commercial |
 
 ## Documentation
 
@@ -105,4 +106,7 @@ detail in `docs/LICENSES.md`.
 
 ## License
 
-Apache-2.0 (`LICENSE`). "Marble" and "World Labs" are trademarks of their respective owners; AdamWorld is not affiliated with or derived from them.
+**Code: Apache-2.0** (`LICENSE`). **Models: under their own licenses** — downloaded at
+runtime, never redistributed here; non-commercial models are opt-in only (see
+`docs/LICENSES.md`). "Marble" and "World Labs" are trademarks of their respective
+owners; AdamWorld is not affiliated with or derived from them.

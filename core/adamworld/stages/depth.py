@@ -46,7 +46,10 @@ class DepthStage(Stage):
         )
 
     def model_version(self, ctx: StageContext) -> str:
-        return "mock-depth@1" if ctx.backend == "mock" else "depth-anything-v2-large"
+        if ctx.backend == "mock":
+            return "mock-depth@1"
+        size = "large" if ctx.settings.allow_noncommercial else "small"
+        return f"depth-anything-v2-{size}"
 
     # --- backends ----------------------------------------------------------
     def _mock(self, w: int, h: int) -> np.ndarray:
@@ -75,7 +78,9 @@ class DepthStage(Stage):
 
         equirect = load_rgb(panorama.path)
         h, w = panorama.height, panorama.width
-        pipe = ctx.get_registry().depth_anything("large")
+        # Apache default = Small; opt into the higher-quality NC sizes explicitly.
+        size = "large" if ctx.settings.allow_noncommercial else "small"
+        pipe = ctx.get_registry().depth_anything(size)
         patch = 384
         accum = np.zeros((h, w), np.float32)
         weight = np.zeros((h, w), np.float32)

@@ -37,12 +37,15 @@ def generate(
     profile: bool = typer.Option(False, help="Print per-stage time + peak VRAM."),
     force: bool = typer.Option(False, help="Ignore cache and recompute."),
     layout: Path = typer.Option(None, "--layout", help="Block-out layout JSON (stage 8)."),
+    allow_noncommercial: bool = typer.Option(
+        False, "--allow-noncommercial", help="Opt into non-commercial models (DAv2 L, FLUX NC)."
+    ),
 ) -> None:
     if layout is not None:
         from adamworld.world.schema import Layout
 
         lay = Layout.model_validate_json(Path(layout).read_text(encoding="utf-8-sig"))
-        pipe = Pipeline(settings=Settings(offload=offload))
+        pipe = Pipeline(settings=Settings(offload=offload, allow_noncommercial=allow_noncommercial))
         world = pipe.generate_from_layout(
             lay, out, backend=backend, resolution=resolution, seed=seed
         )
@@ -61,7 +64,7 @@ def generate(
         backend=backend,
     )
     profiler = Profiler()
-    settings = Settings(offload=offload)
+    settings = Settings(offload=offload, allow_noncommercial=allow_noncommercial)
 
     def _progress(stage: str, frac: float) -> None:
         console.print(f"[dim]{frac * 100:5.1f}%[/dim] {stage}")

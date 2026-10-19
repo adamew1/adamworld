@@ -50,6 +50,10 @@ class Settings(BaseModel):
     dtype: str = "float16"
     # Enable aggressive CPU offload / sequential model loading to fit 16 GB.
     offload: bool = False
+    # Opt in to non-commercial models (e.g. Depth Anything V2 Base/Large/Giant =
+    # CC-BY-NC-4.0, FLUX.1-dev pano backends). Default-off keeps the pipeline
+    # Apache/OpenRAIL-only. See docs/LICENSES.md.
+    allow_noncommercial: bool = False
 
     @property
     def weights_dir(self) -> Path:

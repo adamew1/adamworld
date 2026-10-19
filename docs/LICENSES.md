@@ -1,49 +1,62 @@
 # LICENSES.md — dependency & model license register
 
-Project license: **Apache-2.0**. Rule: a model may be a **default** only if its license is permissive (Apache/MIT/BSD). OpenRAIL defaults require maintainer sign-off; non-commercial (NC) licenses are optional flagged backends only. Re-verify every row marked *(verify)* before downloading weights.
+**Code: Apache-2.0. Models are downloaded at runtime and remain under their own
+licenses — AdamWorld does not redistribute weights.** The default pipeline uses
+only Apache-2.0 and OpenRAIL(++) models; every non-commercial model is gated
+behind `--allow-noncommercial` (`Settings.allow_noncommercial`) and never runs by
+default.
 
-## Models
+License classes: **Permissive** = Apache/MIT/BSD. **OpenRAIL** = CreativeML
+OpenRAIL(++), commercial-ok but use-restricted (our one non-permissive default,
+signed off). **NC** = non-commercial — opt-in only.
 
-| Model | Role | License | Class | Status |
-|-------|------|---------|-------|--------|
-| FLUX.1-schnell | Stage 1 default | Apache-2.0 | Permissive | ✅ default |
-| SDXL-base-1.0 + SDXL-inpaint | Stages 2/5/8 default | CreativeML OpenRAIL++-M | OpenRAIL (commercial-ok, use-restricted) | ⚠ default **pending sign-off** |
-| SD 1.5 | CPU smoke / fallback | CreativeML OpenRAIL-M | OpenRAIL | fallback/test only |
-| Depth Anything V2 — Large/Base/Small | Stage 3 default | Apache-2.0 | Permissive | ✅ default |
-| Depth Anything V2 — Giant | Stage 3 | CC-BY-NC-4.0 | NC | ❌ not used |
-| Depth Anything V2 metric fine-tunes | Stage 3 metric | Apache-2.0 *(verify per checkpoint)* | Permissive | optional |
-| gsplat | Stage 4/5/7 splat engine | Apache-2.0 | Permissive | ✅ core |
-| Inria diff-gaussian-rasterization | — | research-only | NC | ❌ forbidden dependency |
-| ControlNet (code, lllyasviel) | Stage 8 | Apache-2.0 | Permissive | ✅ |
-| ControlNet-depth-SDXL weights | Stage 8 | OpenRAIL/Apache *(verify, prefer Apache)* | — | pending |
-| DiT360 (LoRA on FLUX.1-dev) | Stage 2 NC backend | code MIT; weights FLUX.1-dev (NC) + Insta360 license | NC | optional `--backend flux-pano` |
-| Gimbal360 (LoRA on FLUX.1-Fill-dev) | Stage 2 NC backend | FLUX.1-Fill-dev (NC) | NC | optional backend |
-| FLUX.1-dev / FLUX.1-Fill-dev | — | FLUX.1 [dev] Non-Commercial | NC | backend only |
-| UniDepth v2 | Stage 3 metric backend | CC-BY-NC-4.0 | NC | optional backend |
-| Depth Pro (Apple) | Stage 3 metric backend | Apple ASCL *(verify)* | NC/research | optional backend |
-| DA² / DAP (360 depth) | Stage 3 360 backend | *(verify)* | — | optional, pending |
-| SuGaR / 2DGS | Stage 7 mesh backend | depends on Inria rasterizer | NC | optional backend, flagged |
+## Models the pipeline can download — exact licenses (verified 2026-10-19)
+
+| Model (HF repo) | Role | License (as on the model card) | Default? |
+|-----------------|------|--------------------------------|----------|
+| `black-forest-labs/FLUX.1-schnell` | stage 1 text→image | **apache-2.0** ✅ | default (text) |
+| `stabilityai/stable-diffusion-xl-base-1.0` | SDXL base | **CreativeML OpenRAIL++-M** ⚠ | used by SDXL path |
+| `diffusers/stable-diffusion-xl-1.0-inpainting-0.1` | stages 2/5/8 | **CreativeML OpenRAIL++-M** ⚠ | **default** (pano/inpaint) |
+| `depth-anything/Depth-Anything-V2-Small-hf` | stage 3 depth | **apache-2.0** ✅ | **default** |
+| `depth-anything/Depth-Anything-V2-Base-hf` | stage 3 (opt-in) | **cc-by-nc-4.0** ❌ | `--allow-noncommercial` |
+| `depth-anything/Depth-Anything-V2-Large-hf` | stage 3 (opt-in) | **cc-by-nc-4.0** ❌ | `--allow-noncommercial` |
+| `depth-anything/Depth-Anything-V2-Giant-hf` | stage 3 (opt-in) | **cc-by-nc-4.0** ❌ | `--allow-noncommercial` |
+| `diffusers/controlnet-depth-sdxl-1.0` | stage 8 layout | **openrail++** ⚠ | default (layout) |
+
+> Correction (2026-10-19): an earlier draft wrongly listed Depth Anything V2
+> Base/Large as Apache. Only **Small** is Apache-2.0; Base/Large/Giant are
+> **CC-BY-NC-4.0**. The default is now Small; the others are gated.
+
+## Opt-in non-commercial backends (`--allow-noncommercial`)
+
+| Model | Role | License |
+|-------|------|---------|
+| Depth Anything V2 Base/Large/Giant | higher-quality depth | CC-BY-NC-4.0 |
+| `black-forest-labs/FLUX.1-dev`, `FLUX.1-Fill-dev` | `--backend flux-pano` base | FLUX.1 [dev] Non-Commercial |
+| DiT360 / Gimbal360 LoRA | best 360 panorama | FLUX.1-dev (NC) + Insta360 license |
+| UniDepth v2 | metric depth | CC-BY-NC-4.0 |
+| Apple Depth Pro | metric depth | Apple ASCL (research) |
+
+## LoRA adapters
+
+**None are currently trained, bundled, or downloaded.** A future FLUX.1-schnell
+panorama LoRA (roadmap) would be released Apache-2.0; if added it will be listed
+here with its training-data provenance.
 
 ## Libraries / tooling
 
-| Component | License | Notes |
-|-----------|---------|-------|
-| Spark (`@sparkjsdev/spark`) | MIT | viewer; three.js r180+ |
-| three.js | MIT | |
-| Niantic SPZ format + ref impl | MIT | `.spz` IO |
-| 3dgsconverter (PLY↔SPZ) | MIT *(verify)* | optional SPZ path |
-| Open3D | MIT | TSDF/marching cubes (stage 7) |
-| trimesh | MIT | GLB export |
-| diffusers / transformers / accelerate | Apache-2.0 | model runtime |
-| PyTorch | BSD-3 | |
-| FastAPI / Starlette / pydantic | MIT / BSD | backend |
-| Typer / Click | MIT / BSD | CLI |
-| Vite | MIT | web build |
+| Component | License |
+|-----------|---------|
+| Spark (`@sparkjsdev/spark`), three.js, Niantic SPZ format | MIT |
+| gsplat | Apache-2.0 |
+| diffusers / transformers / accelerate / huggingface_hub | Apache-2.0 |
+| PyTorch | BSD-3 |
+| numpy, pillow, FastAPI, pydantic, Typer, Vite | BSD / MIT |
+| Open3D, trimesh (optional mesh backends) | MIT |
 
-## Open questions to resolve at adoption
-- SDXL-as-default sign-off (OpenRAIL, not Apache).
-- Exact ControlNet-depth-SDXL checkpoint license — prefer an Apache/`diffusers` one.
-- Per-checkpoint license of Depth Anything V2 *metric* fine-tunes.
-- DA²/DAP (360 depth) licenses if we adopt a 360-native depth backend.
-- SDXL-360-diffusion claims MIT but is an SDXL finetune (merged-weight license murky) — avoid as default.
+## Clean-room notes
 
+- The original Inria 3DGS rasterizer (`diff-gaussian-rasterization`) is research-only
+  and is **never** a dependency; all rasterization/fitting uses **gsplat** (Apache-2.0).
+- LucidDreamer / WonderWorld / SuGaR are read as **public papers only**; our
+  occlusion/expansion code is written from scratch (see `docs/PROGRESS.md` H2 audit).
