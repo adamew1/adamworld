@@ -1,6 +1,6 @@
 # PROGRESS.md
 
-## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a ✅ · M4 ✅ · M5 ✅ · M6 ✅ · M7 notebooks ✅ — remaining: M3b (occlusion), run on Kaggle
+## Status: v0.1.0 code-complete — M0–M6 ✅, M7 notebooks + README ✅. Pending: GPU validation on Kaggle (needs your token); README GIFs from that run.
 
 > Milestone order adjusted: did M6 (export) early because it's fully CPU-verifiable and completes the
 > primary `.spz` format + Blender/Unity export. M3a (FLUX text→image) is done; M3b (occlusion fill),

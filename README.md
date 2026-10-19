@@ -4,7 +4,9 @@
 
 AdamWorld is a free and open alternative to tools like Marble. It is an independent, clean-room project that composes open-source models and open model weights into a reproducible pipeline. It is designed to run its default pipeline on a **single free-tier GPU (one 16 GB T4 / P100 on Kaggle or Colab)**.
 
-> **Status: pre-alpha, under active construction.** Following milestones M0→M7 (see `docs/PLAN.md`). This README will carry GIFs, a quickstart, and the full model table at the v0.1.0 release (M7).
+> **Status: v0.1.0 — code-complete.** Milestones M0–M6 are implemented (see `docs/PROGRESS.md`). Everything runs on CPU with the `mock` backend (and is exercised by the test suite + a headless-browser viewer/editor check); the real GPU models run on a free Kaggle/Colab T4 via `notebooks/`. GIFs are captured from a T4 run.
+>
+> _(GIFs: run `notebooks/kaggle_generate.ipynb`, then drop `docs/media/*.gif` here.)_
 
 ## What it does
 
@@ -61,6 +63,37 @@ adamworld generate --prompt "a quiet forest clearing" --out worlds/forest
 | Default pipeline | 1× **T4 / P100, ~16 GB** | fp8/fp16 + CPU offload + tiling; free Kaggle/Colab tier |
 | `--backend large` | 24–80 GB | rented GPU; higher-fidelity backends |
 | Viewer / editor | **none** | runs in any WebGL2 browser |
+
+## More commands
+
+```bash
+adamworld generate --image photo.jpg --out worlds/w     # image -> world
+adamworld generate --layout layout.json --backend mock  # block-out -> world (stage 8)
+adamworld expand   worlds/w --direction north --prompt "a cave mouth"
+adamworld edit     worlds/w --region -5,-5,-5,5,5,5 --delete
+adamworld export   worlds/w --format spz   # or ply | glb (mesh)
+adamworld mesh     worlds/w                # build mesh.glb from cached depth
+adamworld serve                            # API on :8000; web editor at /editor.html
+```
+
+## Models & licenses
+
+Default pipeline is Apache-2.0-compatible. The one non-Apache default is the
+SDXL-class panorama/inpaint generator (OpenRAIL: commercial-ok, use-restricted);
+higher-quality FLUX options are non-commercial and ship only behind a flag. Full
+detail in `docs/LICENSES.md`.
+
+| Stage | Default model | License |
+|-------|---------------|---------|
+| Text → image | FLUX.1-schnell | **Apache-2.0** |
+| Image → 360° pano / inpaint | SDXL + SDXL-inpaint | OpenRAIL++ (flagged) |
+| Depth | Depth Anything V2 (Large) | **Apache-2.0** |
+| Lift / render / refit | gsplat | **Apache-2.0** |
+| Mesh | TSDF/grid + our GLB writer | **MIT/Apache** |
+| Layout conditioning | ControlNet-depth (SDXL) | Apache/OpenRAIL |
+| Viewer | Spark + three.js | **MIT** |
+| Splat file | SPZ (ours, Niantic format) / PLY | **MIT** |
+| — optional NC backends — | DiT360/Gimbal360 (FLUX.1-dev), UniDepth, Depth Pro | non-commercial |
 
 ## Documentation
 
