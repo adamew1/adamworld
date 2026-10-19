@@ -1,6 +1,13 @@
 # PROGRESS.md
 
-## Status: v0.1.0 code-complete — M0–M6 ✅, M7 notebooks + README ✅. Pending: GPU validation on Kaggle (needs your token); README GIFs from that run.
+## Status: v0.1.0 — M0–M7 ✅ and **default pipeline validated on a real free Kaggle T4**.
+
+Validated (image→world, default backend, Tesla T4): SDXL pano + Depth Anything + lift →
+294,912 splats in 132 s, peak VRAM 885 MB (fits a T4 with headroom); loaded + navigated in
+Spark; SPZ ~9× smaller than PLY. See `docs/BENCHMARKS.md`. Known quality limit: plain SDXL
+isn't equirect-aware (seams/soft poles) — higher fidelity via `--backend flux-pano` (NC) or
+the planned FLUX.1-schnell pano LoRA. Still optional: `--mode text` (FLUX) + occlusion (stage 5)
+GPU runs; README GIFs.
 
 > Milestone order adjusted: did M6 (export) early because it's fully CPU-verifiable and completes the
 > primary `.spz` format + Blender/Unity export. M3a (FLUX text→image) is done; M3b (occlusion fill),
