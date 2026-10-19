@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from adamworld.world.schema import InputSpec, WorldMeta
+from adamworld.world.schema import FORMAT_VERSION, InputSpec, WorldMeta
 
 
 def _utc_now_iso() -> str:
@@ -93,6 +93,13 @@ class World:
         root = Path(root)
         if not (root / "world.json").exists():
             raise FileNotFoundError(f"No world.json in {root}")
+        data = json.loads((root / "world.json").read_text(encoding="utf-8"))
+        fv = int(data.get("format_version", 1))
+        if fv > FORMAT_VERSION:
+            raise ValueError(
+                f"world.json format_version {fv} is newer than this build supports "
+                f"({FORMAT_VERSION}). Upgrade adamworld."
+            )
         return cls(root)
 
     # --- metadata ----------------------------------------------------------

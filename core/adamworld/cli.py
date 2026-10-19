@@ -104,12 +104,22 @@ def mesh(
 
 @app.command()
 def expand(
-    world: Path = typer.Argument(...),
-    direction: str = typer.Option("north", help="north|south|east|west or a camera."),
+    world: Path = typer.Argument(..., help="Existing world directory."),
+    direction: str = typer.Option("north", help="north|south|east|west|up|down or x,y,z."),
     prompt: str = typer.Option("", help="What to generate at the new edge."),
+    distance: float = typer.Option(None, help="Override the step distance."),
 ) -> None:
-    console.print("[yellow]World expansion lands in M4.[/yellow]")
-    raise typer.Exit(1)
+    from adamworld.splat import GaussianCloud
+    from adamworld.world import World
+
+    w = World.load(world)
+    profiler = Profiler()
+    pipe = Pipeline(
+        profiler=profiler, progress=lambda s, f: console.print(f"[dim]{f * 100:5.1f}%[/dim] {s}")
+    )
+    pipe.expand(w, direction=direction, prompt=prompt, distance=distance)
+    n = len(GaussianCloud.load_ply(w.splats_ply))
+    console.print(f"[green]Expanded[/green] {direction}: {n} splats, {len(w.meta().tiles)} tiles")
 
 
 @app.command()

@@ -9,11 +9,13 @@ so peak VRAM stays within ~16 GB.
 from __future__ import annotations
 
 import shutil
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypeVar
 
+import numpy as np
 from pydantic import BaseModel
 
 from adamworld.cache import stage_cache_key
@@ -29,6 +31,7 @@ from adamworld.stages.panorama import PanoramaStage
 from adamworld.stages.text_to_image import TextToImageStage
 from adamworld.types import DepthRef, GenerationRequest, ImageRef, PanoramaRef, SplatRef
 from adamworld.world import InputSpec, World
+from adamworld.world.schema import Tile
 
 P = TypeVar("P", bound=BaseModel)
 
@@ -181,6 +184,107 @@ class Pipeline:
         self._emit("done", 1.0)
         return world
 
+    def expand(
+        self,
+        world: World,
+        direction: str,
+        prompt: str,
+        *,
+        distance: float | None = None,
+        seed: int | None = None,
+    ) -> World:
+        """Generate an adjoining region at an edge and merge it as a new tile.
+
+        The new region is generated (stages 1-4), translated to the frontier, and
+        merged into the global splat set. Boundary depth-alignment (seamless joins)
+        is the GPU-quality refinement; the mock path translates + concatenates so
+        the mechanics (grow + tile bookkeeping + versioned history) are exercised
+        on CPU.
+        """
+        meta = world.meta()
+        tile_index = len(meta.tiles)
+        ctx = StageContext(
+            world=world,
+            settings=self.settings,
+            profiler=self.profiler,
+            seed=(seed if seed is not None else meta.seed + 1 + tile_index),
+            resolution=int(meta.params.get("resolution", 512)),
+            backend=str(meta.params.get("backend", "mock")),
+            registry=ModelRegistry(self.settings),
+            force=self.force,
+        )
+        self._emit("expand", 0.1)
+        region = self._region_cloud(ctx, prompt)
+
+        new = GaussianCloud.load_ply(region.path)
+        extent = float(np.ptp(np.array(meta.bounds.aabb_max) - np.array(meta.bounds.aabb_min)))
+        step = distance if distance is not None else max(4.0, extent * 0.5)
+        offset = _direction_vector(direction) * step
+        new.means = (new.means + offset.astype(np.float32)).astype(np.float32)
+
+        existing = GaussianCloud.load_ply(world.splats_ply)
+        merged = GaussianCloud.concat([existing, new])
+        self._emit("merge", 0.85)
+        merged.save_ply(world.splats_ply)
+        merged.save_spz(world.splats_spz)
+
+        lo, hi = merged.aabb()
+        meta = world.meta()  # reload (history may have changed it)
+        meta.bounds.aabb_min, meta.bounds.aabb_max = lo, hi
+        meta.tiles.append(
+            Tile(
+                id=uuid.uuid4().hex,
+                origin=(float(offset[0]), float(offset[1]), float(offset[2])),
+                source="expand",
+                splat_range=(len(existing), len(merged)),
+            )
+        )
+        world.save_meta(meta)
+        world.add_edit({"type": "expand", "direction": direction, "prompt": prompt, "step": step})
+        self._emit("done", 1.0)
+        return world
+
+    def _region_cloud(self, ctx: StageContext, prompt: str) -> SplatRef:
+        """Run stages 1-4 for a prompt and return the splat cloud (origin-centered)."""
+        t2i, pano_stage = TextToImageStage(), PanoramaStage()
+        depth_stage, lift_stage = DepthStage(), LiftStage()
+        image = self._run_stage(
+            t2i,
+            ctx,
+            inputs=None,
+            out_cls=ImageRef,
+            extra={"prompt": prompt},
+            runner=lambda prefix: t2i.run(ctx, prompt=prompt, out_prefix=prefix),
+        )
+        panorama = self._run_stage(
+            pano_stage,
+            ctx,
+            inputs=image,
+            out_cls=PanoramaRef,
+            extra={"prompt": prompt},
+            runner=lambda prefix: pano_stage.run(
+                ctx, image=image, prompt=prompt, out_prefix=prefix
+            ),
+        )
+        depth = self._run_stage(
+            depth_stage,
+            ctx,
+            inputs=panorama,
+            out_cls=DepthRef,
+            extra={},
+            runner=lambda prefix: depth_stage.run(ctx, panorama=panorama, out_prefix=prefix),
+        )
+        return self._run_stage(
+            lift_stage,
+            ctx,
+            inputs=_merge_refs(panorama, depth),
+            out_cls=SplatRef,
+            extra={},
+            runner=lambda prefix: lift_stage.run(
+                ctx, panorama=panorama, depth=depth, out_prefix=prefix
+            ),
+        )
+
     # --- helpers -----------------------------------------------------------
     def _resolve_seed_image(
         self,
@@ -220,6 +324,31 @@ class Pipeline:
         dst = ctx.world.cache_dir / "panorama" / "user.png"
         save_rgb(dst, arr)
         return PanoramaRef(path=dst, width=w, height=h, key="user")
+
+
+_DIRECTIONS = {
+    "north": (0.0, 0.0, -1.0),
+    "south": (0.0, 0.0, 1.0),
+    "east": (1.0, 0.0, 0.0),
+    "west": (-1.0, 0.0, 0.0),
+    "up": (0.0, 1.0, 0.0),
+    "down": (0.0, -1.0, 0.0),
+}
+
+
+def _direction_vector(direction: str) -> np.ndarray:
+    d = direction.strip().lower()
+    if d in _DIRECTIONS:
+        return np.array(_DIRECTIONS[d], np.float32)
+    try:  # accept "x,y,z"
+        parts = [float(x) for x in d.split(",")]
+        v = np.array(parts[:3], np.float32)
+        n = float(np.linalg.norm(v))
+        return v / n if n > 0 else np.array([0.0, 0.0, -1.0], np.float32)
+    except ValueError as exc:
+        raise ValueError(
+            f"Unknown direction '{direction}' (use north/south/east/west/up/down or x,y,z)"
+        ) from exc
 
 
 def _merge_refs(panorama: PanoramaRef, depth: DepthRef) -> BaseModel:

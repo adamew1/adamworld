@@ -39,6 +39,11 @@ class GenerateBody(BaseModel):
     backend: str = "default"
 
 
+class ExpandBody(BaseModel):
+    direction: str = "north"
+    prompt: str = ""
+
+
 def create_app(
     worlds_root: Path | None = None,
     settings: Settings | None = None,
@@ -125,8 +130,19 @@ def create_app(
         return FileResponse(p, filename=f"{world_id}.{format}")
 
     @app.post("/worlds/{world_id}/expand")
-    def expand_world(world_id: str) -> dict:
-        raise HTTPException(501, "expansion lands in M4")
+    def expand_world(world_id: str, body: ExpandBody) -> dict:
+        d = world_dir(world_id)
+        if not (d / "world.json").exists():
+            raise HTTPException(404, "world not found")
+
+        def _job(progress: ProgressCb) -> str:
+            from adamworld.world import World
+
+            pipeline = Pipeline(settings=settings, profiler=Profiler(), progress=progress)
+            pipeline.expand(World.load(d), direction=body.direction, prompt=body.prompt)
+            return world_id
+
+        return {"job_id": queue.submit(_job), "world_id": world_id}
 
     @app.post("/worlds/{world_id}/edit")
     def edit_world(world_id: str) -> dict:

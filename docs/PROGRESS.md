@@ -1,6 +1,6 @@
 # PROGRESS.md
 
-## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a (text) ✅ · M6 ✅ — remaining: M3b (occlusion), M4, M5, run on Kaggle
+## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a ✅ · M4 ✅ · M6 ✅ — remaining: M3b (occlusion), M5 (layout editor), run on Kaggle
 
 > Milestone order adjusted: did M6 (export) early because it's fully CPU-verifiable and completes the
 > primary `.spz` format + Blender/Unity export. M3a (FLUX text→image) is done; M3b (occlusion fill),
@@ -29,9 +29,12 @@
 - **M7 notebooks:** `kaggle_generate.ipynb`, `colab_generate.ipynb`, and `run_on_kaggle.py` (headless: package `core/` → push GPU kernel → poll → pull `world.zip`).
 - **M6 Export:** `splats.spz` (hand-written Niantic SPZ v2, **verified rendering in Spark**, ~15× smaller than PLY) + `splats.ply` + `mesh.glb` (equirect-depth environment mesh via a self-contained GLB writer). CLI `export --format ply|spz|glb` (glb builds from cache) + `mesh`. Guides: `docs/export/blender.md`, `unity.md`. Gates green (23 tests).
 
+- **M4 Persistence + expansion:** `world.json` format **frozen** (format_version=1, load-time version guard); versioned `history/` (tested); stage 6 `expand` — generate an adjoining region (stages 1-4), translate to the frontier, merge into the splat set, record a `tile` + history edit. CLI `expand` + API `POST /worlds/{id}/expand`. Verified: world grows 4.6k→9.2k→13.8k splats across two expansions, 2 tiles, 2 edits.
+
 ### Next
 - **Run on Kaggle** (needs your `~/.kaggle/kaggle.json`): `python notebooks/run_on_kaggle.py --mode image` → validate real SDXL pano + Depth Anything + lift on a T4, then `--mode text` for FLUX.
-- **M3b Occlusion fill**, **M4 Persistence + expansion**, **M5 Layout editor** (browser, Playwright-verifiable).
+- **M5 Layout editor** (browser block-out + stage 8 conditioning; Playwright-verifiable).
+- **M3b Occlusion fill** (novel-view inpaint + refit; GPU, validated on Kaggle).
 
 ### Known issues / notes
 - Global `%TEMP%\pytest-of-*` is permission-locked on this PC; `conftest.py` redirects temp root to project-local `.pytest_tmp`.
