@@ -56,6 +56,7 @@ class Pipeline:
     profiler: Profiler = field(default_factory=Profiler)
     force: bool = False
     progress: ProgressCb | None = None
+    occlusion: bool = True  # run stage 5 for GPU backends (needs gsplat)
 
     def _emit(self, stage: str, frac: float) -> None:
         if self.progress is not None:
@@ -172,7 +173,7 @@ class Pipeline:
 
         # --- stage 5: fill occlusions (GPU backends only) ------------------
         final_splats = splats
-        if ctx.backend != "mock":
+        if ctx.backend != "mock" and self.occlusion:
             self._emit("occlusion", 0.82)
             occ = OcclusionStage()
             final_splats = self._run_stage(

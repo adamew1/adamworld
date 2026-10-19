@@ -42,20 +42,39 @@ def _seed_image(path: Path) -> None:
 
 
 def _run_source(mode: str) -> str:
-    image = "'/kaggle/input/adamworld-core/seed.png'" if mode == "image" else "None"
+    use_image = "True" if mode == "image" else "False"
     prompt = "'a quiet forest clearing with a mossy stone well'"
     return f"""
-import os, glob
+import os, glob, sys, subprocess, zipfile
 os.environ['ADAMWORLD_CACHE'] = '/kaggle/working/.adamworld_cache'
-import subprocess, sys
-SRC = next(iter(glob.glob('/kaggle/input/*/core')))
-subprocess.run([sys.executable,'-m','pip','install','-q',SRC], check=True)
-subprocess.run([sys.executable,'-m','pip','install','-q','diffusers==0.31.0',
-    'transformers==4.46.2','accelerate==1.1.1','safetensors','huggingface_hub',
-    'opencv-python-headless','gsplat'], check=True)
+
+# Locate the adamworld source robustly (dataset layout can vary / may be zipped).
+for r in glob.glob('/kaggle/input/*'):
+    print('input:', r, '->', os.listdir(r)[:8], flush=True)
+for z in glob.glob('/kaggle/input/**/*.zip', recursive=True):
+    zipfile.ZipFile(z).extractall('/kaggle/working/src')
+SRC = None
+for p in (glob.glob('/kaggle/input/**/pyproject.toml', recursive=True)
+          + glob.glob('/kaggle/working/src/**/pyproject.toml', recursive=True)):
+    SRC = os.path.dirname(p)
+    break
+assert SRC, 'could not locate adamworld core (no pyproject.toml under /kaggle/input)'
+print('SRC =', SRC, flush=True)
+
+# Pure-Python package: put it on sys.path (no build step) and pip-install only the
+# dependency wheels. Avoids pip build-isolation issues on the Kaggle image.
+sys.path.insert(0, SRC)
+subprocess.run([sys.executable,'-m','pip','install','-q','pydantic>=2','platformdirs',
+    'diffusers==0.31.0','transformers==4.46.2','accelerate==1.1.1','safetensors',
+    'huggingface_hub'], check=True)
 
 import torch
-print('CUDA', torch.cuda.is_available(), torch.cuda.get_device_name(0))
+print('CUDA', torch.cuda.is_available(), torch.cuda.get_device_name(0), flush=True)
+
+IMAGE = None
+if {use_image}:
+    seeds = glob.glob('/kaggle/input/**/seed.png', recursive=True) + glob.glob('/kaggle/working/src/**/seed.png', recursive=True)
+    IMAGE = seeds[0] if seeds else None
 
 from pathlib import Path
 from adamworld.pipeline import Pipeline
@@ -63,18 +82,18 @@ from adamworld.profiling import Profiler
 from adamworld.config import Settings
 from adamworld.types import GenerationRequest
 
-req = GenerationRequest(prompt={prompt}, image_paths=[Path({image})] if {image} else [],
+req = GenerationRequest(prompt={prompt}, image_paths=[Path(IMAGE)] if IMAGE else [],
                         resolution=768, backend='default', seed=0)
 prof = Profiler()
-world = Pipeline(settings=Settings(offload=True), profiler=prof,
+world = Pipeline(settings=Settings(offload=True), profiler=prof, occlusion=False,
                  progress=lambda s,f: print(f'{{f*100:6.1f}}%  {{s}}', flush=True)).generate(
     req, Path('/kaggle/working/world'))
-print(prof.table())
+print(prof.table(), flush=True)
 import shutil
 from adamworld.splat import GaussianCloud
-print('splats:', len(GaussianCloud.load_ply(world.splats_ply)))
+print('splats:', len(GaussianCloud.load_ply(world.splats_ply)), flush=True)
 shutil.make_archive('/kaggle/working/world', 'zip', world.root)
-print('OK wrote world.zip')
+print('OK wrote world.zip', flush=True)
 """
 
 
@@ -132,7 +151,17 @@ def main() -> None:
     except Exception:
         print("creating dataset ...")
         api.dataset_create_new(str(ds_dir), dir_mode="zip")
-    time.sleep(args.poll)
+
+    # Wait until the dataset finishes processing so the kernel can mount it.
+    for _ in range(20):
+        time.sleep(args.poll)
+        try:
+            st = str(api.dataset_status(f"{user}/{DATASET_SLUG}"))
+            print("dataset status:", st, flush=True)
+            if "ready" in st.lower():
+                break
+        except Exception as exc:
+            print("dataset not ready yet:", exc, flush=True)
 
     # --- 2. kernel ---
     k_dir = STAGE / "kernel"
@@ -160,13 +189,17 @@ def main() -> None:
         time.sleep(args.poll)
         st = api.kernels_status(kref)
         status = st.get("status") if isinstance(st, dict) else getattr(st, "status", st)
+        s = str(status).lower()
         print("status:", status, flush=True)
-        if str(status).lower() in ("complete", "error", "cancelacknowledged"):
+        if any(k in s for k in ("complete", "error", "cancel")):
             break
     out = STAGE / "output"
     out.mkdir(exist_ok=True)
-    api.kernels_output(kref, str(out))
-    print("downloaded output to", out)
+    try:
+        api.kernels_output(kref, str(out))
+        print("downloaded output to", out)
+    except Exception as exc:  # e.g. Windows cp1252 log-write bug in the kaggle client
+        print("kernels_output partial (continuing):", exc)
     print("open the .log to see the run; world.zip is the generated world.")
 
 
