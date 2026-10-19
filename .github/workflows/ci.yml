@@ -31,6 +31,15 @@ jobs:
       - name: Pytest (CPU smoke + unit)
         run: pytest -q
 
+  secrets:
+    name: secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so gitleaks scans every commit
+      - uses: gitleaks/gitleaks-action@v2
+
   web:
     name: web (lint + build)
     runs-on: ubuntu-latest

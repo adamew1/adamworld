@@ -38,6 +38,16 @@ worlds/
 *.ksplat
 !tests/**/fixtures/**
 
+# Secrets / credentials — never commit
+.env
+.env.*
+kaggle.json
+**/kaggle.json
+access_token
+*.pem
+*.key
+id_rsa*
+
 # OS / editor
 .DS_Store
 Thumbs.db
