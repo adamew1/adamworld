@@ -41,11 +41,19 @@ def _reset_peak() -> None:
 
 
 def _peak_mb() -> float:
+    """Peak VRAM for the stage as the allocator's high-water *reserved* bytes.
+
+    We report ``max_memory_reserved`` (not ``max_memory_allocated``): reserved is
+    the memory the caching allocator actually held from the GPU, which reflects the
+    real footprint. With ``enable_sequential_cpu_offload`` this is legitimately
+    low, because model weights are streamed from CPU layer-by-layer rather than
+    kept resident — that is the point of offload, not a measurement error.
+    """
     if _cuda_available():
         import torch  # noqa: PLC0415
 
         torch.cuda.synchronize()
-        return float(torch.cuda.max_memory_allocated()) / (1024 * 1024)
+        return float(torch.cuda.max_memory_reserved()) / (1024 * 1024)
     return 0.0
 
 
@@ -67,13 +75,13 @@ class Profiler:
         if not self.records:
             return "(no stages profiled)"
         name_w = max(len(r.name) for r in self.records + [StageProfile("stage", 0, 0)])
-        lines = [f"{'stage'.ljust(name_w)}   time(s)   peak VRAM(MB)"]
-        lines.append("-" * (name_w + 26))
+        lines = [f"{'stage'.ljust(name_w)}   time(s)   peak VRAM MB (reserved)"]
+        lines.append("-" * (name_w + 35))
         for r in self.records:
             lines.append(f"{r.name.ljust(name_w)}   {r.seconds:7.2f}   {r.peak_vram_mb:12.1f}")
         total = sum(r.seconds for r in self.records)
         peak = max((r.peak_vram_mb for r in self.records), default=0.0)
-        lines.append("-" * (name_w + 26))
+        lines.append("-" * (name_w + 35))
         lines.append(f"{'TOTAL'.ljust(name_w)}   {total:7.2f}   {peak:12.1f}")
         return "\n".join(lines)
 

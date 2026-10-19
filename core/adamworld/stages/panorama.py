@@ -89,12 +89,13 @@ class PanoramaStage(Stage):
         ctx: StageContext,
     ) -> np.ndarray:
         """Project the seed image onto an equirect canvas, then SDXL-inpaint the
-        rest. Horizontal circular padding makes the left/right edges wrap
-        seamlessly. (The ``flux-pano`` backend swaps in DiT360 / FLUX.1-dev, NC.)
+        rest with seamless-360 fixes (see ``pano_seams``): circular-padded convs so
+        the left/right edges wrap, optional latent rolling, and cube-face pole
+        inpainting. (The ``flux-pano`` backend swaps in DiT360 / FLUX.1-dev, NC.)
         """
         from PIL import Image  # noqa: PLC0415
 
-        from adamworld import geometry  # noqa: PLC0415
+        from adamworld import geometry, pano_seams  # noqa: PLC0415
 
         if image is not None:
             seed = load_rgb(image.path)
@@ -105,20 +106,37 @@ class PanoramaStage(Stage):
 
         # diffusers inpaint convention: white (255) = fill, black = keep.
         inpaint_mask = ((known < 0.5) * 255).astype(np.uint8)
-
-        pad = w // 8
-        canvas_p = geometry.horizontal_wrap_pad(canvas, pad)
-        mask_p = geometry.horizontal_wrap_pad(inpaint_mask[..., None], pad)[..., 0]
-
+        full_prompt = (
+            prompt or "a seamless 360 degree equirectangular panorama"
+        ) + ", 360 panorama"
         pipe = ctx.get_registry().sdxl_inpaint()
-        result = pipe(
-            prompt=(prompt or "a seamless 360 degree equirectangular panorama") + ", 360 panorama",
-            image=Image.fromarray(canvas_p),
-            mask_image=Image.fromarray(mask_p),
-            width=canvas_p.shape[1],
-            height=canvas_p.shape[0],
-            num_inference_steps=30,
-            guidance_scale=7.0,
+
+        # Circular padding on every conv makes features wrap across the seam.
+        saved = pano_seams.patch_circular_conv(pipe.unet, pipe.vae)
+        # Latent rolling only when there is no fixed region (rolling desyncs the
+        # inpaint mask / known-region blend, so skip it when a seed is pinned).
+        roller = pano_seams.LatentRoller() if known.sum() == 0 else None
+        extra = (
+            {"callback_on_step_end": roller, "callback_on_step_end_tensor_inputs": ["latents"]}
+            if roller is not None
+            else {}
         )
-        out = np.asarray(result.images[0].convert("RGB"), dtype=np.uint8)
-        return out[:, pad : pad + w]  # crop the circular padding back off
+        try:
+            result = pipe(
+                prompt=full_prompt,
+                image=Image.fromarray(canvas),
+                mask_image=Image.fromarray(inpaint_mask),
+                width=w,
+                height=h,
+                num_inference_steps=30,
+                guidance_scale=7.0,
+                **extra,
+            )
+            out = np.asarray(result.images[0].convert("RGB"), dtype=np.uint8)
+            if roller is not None:
+                out = roller.unroll_image(out)
+        finally:
+            pano_seams.unpatch_circular_conv(saved)
+
+        # Fix the poles (top/bottom cube faces).
+        return pano_seams.inpaint_poles(out, pipe, prompt)

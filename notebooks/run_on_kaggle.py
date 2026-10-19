@@ -41,14 +41,11 @@ def _seed_image(path: Path) -> None:
     Image.fromarray(img.astype("uint8")).save(path)
 
 
-def _run_source(mode: str) -> str:
-    use_image = "True" if mode == "image" else "False"
-    prompt = "'a quiet forest clearing with a mossy stone well'"
-    return f"""
+# Shared setup: robust source discovery (dataset layout varies / may be zipped),
+# sys.path install (no build step), deps, and the common imports.
+_PRELUDE = r"""
 import os, glob, sys, subprocess, zipfile
 os.environ['ADAMWORLD_CACHE'] = '/kaggle/working/.adamworld_cache'
-
-# Locate the adamworld source robustly (dataset layout can vary / may be zipped).
 for r in glob.glob('/kaggle/input/*'):
     print('input:', r, '->', os.listdir(r)[:8], flush=True)
 for z in glob.glob('/kaggle/input/**/*.zip', recursive=True):
@@ -56,32 +53,31 @@ for z in glob.glob('/kaggle/input/**/*.zip', recursive=True):
 SRC = None
 for p in (glob.glob('/kaggle/input/**/pyproject.toml', recursive=True)
           + glob.glob('/kaggle/working/src/**/pyproject.toml', recursive=True)):
-    SRC = os.path.dirname(p)
-    break
+    SRC = os.path.dirname(p); break
 assert SRC, 'could not locate adamworld core (no pyproject.toml under /kaggle/input)'
 print('SRC =', SRC, flush=True)
-
-# Pure-Python package: put it on sys.path (no build step) and pip-install only the
-# dependency wheels. Avoids pip build-isolation issues on the Kaggle image.
 sys.path.insert(0, SRC)
 subprocess.run([sys.executable,'-m','pip','install','-q','pydantic>=2','platformdirs',
     'diffusers==0.31.0','transformers==4.46.2','accelerate==1.1.1','safetensors',
     'huggingface_hub'], check=True)
-
 import torch
 print('CUDA', torch.cuda.is_available(), torch.cuda.get_device_name(0), flush=True)
-
-IMAGE = None
-if {use_image}:
-    seeds = glob.glob('/kaggle/input/**/seed.png', recursive=True) + glob.glob('/kaggle/working/src/**/seed.png', recursive=True)
-    IMAGE = seeds[0] if seeds else None
-
+_seeds = (glob.glob('/kaggle/input/**/seed.png', recursive=True)
+          + glob.glob('/kaggle/working/src/**/seed.png', recursive=True))
+SEED_IMG = _seeds[0] if _seeds else None
 from pathlib import Path
 from adamworld.pipeline import Pipeline
 from adamworld.profiling import Profiler
 from adamworld.config import Settings
 from adamworld.types import GenerationRequest
+"""
 
+
+def _run_source(mode: str) -> str:
+    use_image = "True" if mode == "image" else "False"
+    prompt = "'a quiet forest clearing with a mossy stone well'"
+    tail = f"""
+IMAGE = SEED_IMG if {use_image} else None
 req = GenerationRequest(prompt={prompt}, image_paths=[Path(IMAGE)] if IMAGE else [],
                         resolution=768, backend='default', seed=0)
 prof = Profiler()
@@ -95,9 +91,33 @@ print('splats:', len(GaussianCloud.load_ply(world.splats_ply)), flush=True)
 shutil.make_archive('/kaggle/working/world', 'zip', world.root)
 print('OK wrote world.zip', flush=True)
 """
+    return _PRELUDE + tail
 
 
-def _notebook(mode: str) -> dict:
+def _bench_source() -> str:
+    """Benchmark: image->world at 768 with offload OFF then ON; honest reserved
+    VRAM per stage + device-used (~nvidia-smi) for cross-check."""
+    tail = """
+def _dev_used_mb():
+    free, total = torch.cuda.mem_get_info()
+    return (total - free) / (1024 * 1024)
+for off in (True, False):
+    torch.cuda.empty_cache(); torch.cuda.reset_peak_memory_stats()
+    print(f"\\n===== offload={off} =====", flush=True)
+    prof = Profiler()
+    Pipeline(settings=Settings(offload=off), profiler=prof, occlusion=False).generate(
+        GenerationRequest(prompt='a quiet forest clearing',
+                          image_paths=[Path(SEED_IMG)] if SEED_IMG else [],
+                          resolution=768, backend='default', seed=0),
+        Path(f'/kaggle/working/bench_{off}'))
+    print(prof.table(), flush=True)
+    print('device used after run (MB, ~nvidia-smi):', round(_dev_used_mb(), 1), flush=True)
+print('OK bench done', flush=True)
+"""
+    return _PRELUDE + tail
+
+
+def _notebook(source: str) -> dict:
     return {
         "cells": [
             {
@@ -105,7 +125,7 @@ def _notebook(mode: str) -> dict:
                 "metadata": {},
                 "execution_count": None,
                 "outputs": [],
-                "source": _run_source(mode).strip("\n").splitlines(keepends=True),
+                "source": source.strip("\n").splitlines(keepends=True),
             }
         ],
         "metadata": {
@@ -119,7 +139,7 @@ def _notebook(mode: str) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["image", "text"], default="image")
+    ap.add_argument("--mode", choices=["image", "text", "bench"], default="image")
     ap.add_argument("--poll", type=int, default=30, help="status poll interval (s)")
     args = ap.parse_args()
 
@@ -168,7 +188,8 @@ def main() -> None:
     if k_dir.exists():
         shutil.rmtree(k_dir)
     k_dir.mkdir(parents=True)
-    (k_dir / "adamworld-generate.ipynb").write_text(json.dumps(_notebook(args.mode), indent=1))
+    source = _bench_source() if args.mode == "bench" else _run_source(args.mode)
+    (k_dir / "adamworld-generate.ipynb").write_text(json.dumps(_notebook(source), indent=1))
     (k_dir / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{KERNEL_SLUG}",
         "title": "adamworld-generate",
