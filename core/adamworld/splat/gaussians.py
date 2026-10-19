@@ -51,6 +51,16 @@ class GaussianCloud:
             float(hi[2]),
         )
 
+    def filter(self, keep: np.ndarray) -> GaussianCloud:
+        """Return a new cloud keeping only splats where ``keep`` (bool mask) is True."""
+        return GaussianCloud(
+            means=self.means[keep],
+            colors=self.colors[keep],
+            opacity=self.opacity[keep],
+            scales=self.scales[keep],
+            quats=self.quats[keep],
+        )
+
     @classmethod
     def concat(cls, clouds: list[GaussianCloud]) -> GaussianCloud:
         clouds = [c for c in clouds if len(c) > 0]

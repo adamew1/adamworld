@@ -1,6 +1,6 @@
 # PROGRESS.md
 
-## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a ✅ · M4 ✅ · M6 ✅ — remaining: M3b (occlusion), M5 (layout editor), run on Kaggle
+## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a ✅ · M4 ✅ · M5 ✅ · M6 ✅ · M7 notebooks ✅ — remaining: M3b (occlusion), run on Kaggle
 
 > Milestone order adjusted: did M6 (export) early because it's fully CPU-verifiable and completes the
 > primary `.spz` format + Blender/Unity export. M3a (FLUX text→image) is done; M3b (occlusion fill),
@@ -31,10 +31,12 @@
 
 - **M4 Persistence + expansion:** `world.json` format **frozen** (format_version=1, load-time version guard); versioned `history/` (tested); stage 6 `expand` — generate an adjoining region (stages 1-4), translate to the frontier, merge into the splat set, record a `tile` + history edit. CLI `expand` + API `POST /worlds/{id}/expand`. Verified: world grows 4.6k→9.2k→13.8k splats across two expansions, 2 tiles, 2 edits.
 
+- **M5 Layout editor:** `layout_raster.py` casts a ray per equirect pixel against unit box/plane/cylinder primitives (from the editor's column-major transforms) → equirect depth + label map (stage 8). `generate_from_layout` (mock) lifts that into a 3D block-out; `edit_region` deletes/regenerates splats in an AABB (delete is CPU). Browser `editor.html`/`editor.ts`: three.js + OrbitControls + TransformControls, add/move/rotate/scale box·plane·cylinder, labels, style prompt, "Generate world". CLI `generate --layout`, `edit --region --delete`; API `/edit` + layout in `POST /worlds`. **Verified end-to-end in a headless browser:** placed 2 blocks → Generate → backend built a layout world (kind=layout, spz/ply) → viewer rendered it. Gates green (29 tests).
+
 ### Next
 - **Run on Kaggle** (needs your `~/.kaggle/kaggle.json`): `python notebooks/run_on_kaggle.py --mode image` → validate real SDXL pano + Depth Anything + lift on a T4, then `--mode text` for FLUX.
-- **M5 Layout editor** (browser block-out + stage 8 conditioning; Playwright-verifiable).
 - **M3b Occlusion fill** (novel-view inpaint + refit; GPU, validated on Kaggle).
+- Then tag **v0.1.0** (README GIFs + model/license table).
 
 ### Known issues / notes
 - Global `%TEMP%\pytest-of-*` is permission-locked on this PC; `conftest.py` redirects temp root to project-local `.pytest_tmp`.

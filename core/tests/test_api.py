@@ -51,3 +51,32 @@ def test_unknown_job_and_world(tmp_path: Path) -> None:
     client = TestClient(create_app(worlds_root=tmp_path / "worlds"))
     assert client.get("/jobs/nope").status_code == 404
     assert client.get("/worlds/nope").status_code == 404
+
+
+def test_layout_generate_and_region_delete(tmp_path: Path) -> None:
+    client = TestClient(create_app(worlds_root=tmp_path / "worlds"))
+    layout = {
+        "style_prompt": "a hall",
+        "blocks": [
+            {
+                "id": "b0",
+                "shape": "box",
+                "label": "room",
+                "transform": [8, 0, 0, 0, 0, 8, 0, 0, 0, 0, 8, 0, 0, 0, 0, 1],
+            }
+        ],
+    }
+    resp = client.post("/worlds", json={"layout": layout, "backend": "mock", "resolution": 64})
+    body = resp.json()
+    assert _wait_done(client, body["job_id"])["status"] == "done"
+
+    wid = body["world_id"]
+    got = client.get(f"/worlds/{wid}").json()
+    assert got["meta"]["input"]["kind"] == "layout"
+
+    # Region delete via the edit endpoint.
+    edit = client.post(
+        f"/worlds/{wid}/edit",
+        json={"aabb_min": [-50, -50, -50], "aabb_max": [50, 50, 50], "delete": True},
+    )
+    assert edit.status_code == 200

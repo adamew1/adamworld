@@ -31,7 +31,7 @@ from adamworld.stages.panorama import PanoramaStage
 from adamworld.stages.text_to_image import TextToImageStage
 from adamworld.types import DepthRef, GenerationRequest, ImageRef, PanoramaRef, SplatRef
 from adamworld.world import InputSpec, World
-from adamworld.world.schema import Tile
+from adamworld.world.schema import Layout, Tile
 
 P = TypeVar("P", bound=BaseModel)
 
@@ -242,6 +242,92 @@ class Pipeline:
         world.save_meta(meta)
         world.add_edit({"type": "expand", "direction": direction, "prompt": prompt, "step": step})
         self._emit("done", 1.0)
+        return world
+
+    def generate_from_layout(
+        self,
+        layout: Layout,
+        out_dir: Path,
+        *,
+        backend: str = "mock",
+        resolution: int = 512,
+        seed: int = 0,
+    ) -> World:
+        """Generate a world from a block-out layout (stage 8).
+
+        ``mock`` rasterizes the blocks to an equirect depth + flat label colors and
+        lifts them into a 3D block-out preview (CPU). ``default`` feeds the block
+        depth to ControlNet-depth (SDXL) so generation follows the layout (GPU).
+        """
+        from adamworld.layout_raster import layout_label_colors, rasterize_layout
+
+        world = World.create(
+            out_dir,
+            input=InputSpec(kind="layout", prompt=layout.style_prompt),
+            seed=seed,
+            params={"resolution": resolution, "backend": backend, "offload": self.settings.offload},
+        )
+        h = max(16, resolution // 2)
+        w = h * 2
+        if backend != "mock":
+            raise NotImplementedError(
+                "Layout conditioning with ControlNet-depth (SDXL) runs on GPU; "
+                "use --backend mock for the CPU block-out preview."
+            )
+        self._emit("layout", 0.3)
+        depth, label_id = rasterize_layout(layout, h, w)
+        rgb = layout_label_colors(layout, label_id)
+        cloud = GaussianCloud.from_rgbd_equirect(rgb, depth, max_points=400_000)
+
+        self._emit("finalize", 0.9)
+        cloud.save_ply(world.splats_ply)
+        cloud.save_spz(world.splats_spz)
+        save_thumbnail(world.thumbnail, rgb)
+        meta = world.meta()
+        meta.layout = layout
+        meta.model_versions = {"layout": "mock-blockout@1"}
+        meta.bounds.aabb_min, meta.bounds.aabb_max = cloud.aabb()
+        world.save_meta(meta)
+        self._emit("done", 1.0)
+        return world
+
+    def edit_region(
+        self,
+        world: World,
+        aabb_min: tuple[float, float, float],
+        aabb_max: tuple[float, float, float],
+        *,
+        delete: bool = False,
+        regenerate: bool = False,
+        style: str = "",
+    ) -> World:
+        """Delete or regenerate the splats inside an axis-aligned region."""
+        cloud = GaussianCloud.load_ply(world.splats_ply)
+        lo = np.array(aabb_min, np.float32)
+        hi = np.array(aabb_max, np.float32)
+        inside = np.all(cloud.means >= lo, axis=1) & np.all(cloud.means <= hi, axis=1)
+        if regenerate:
+            raise NotImplementedError(
+                "Region regeneration uses ControlNet conditioning (GPU); "
+                "region delete is available on CPU."
+            )
+        if not delete:
+            raise ValueError("edit_region needs delete=True or regenerate=True")
+
+        kept = cloud.filter(~inside)
+        kept.save_ply(world.splats_ply)
+        kept.save_spz(world.splats_spz)
+        meta = world.meta()
+        meta.bounds.aabb_min, meta.bounds.aabb_max = kept.aabb()
+        world.save_meta(meta)
+        world.add_edit(
+            {
+                "type": "delete_region",
+                "aabb_min": list(aabb_min),
+                "aabb_max": list(aabb_max),
+                "removed": int(inside.sum()),
+            }
+        )
         return world
 
     def _region_cloud(self, ctx: StageContext, prompt: str) -> SplatRef:

@@ -34,6 +34,7 @@ class GenerateBody(BaseModel):
     prompt: str | None = None
     image_path: str | None = None
     panorama_path: str | None = None
+    layout: dict | None = None  # a block-out Layout (stage 8)
     seed: int = 0
     resolution: int = 1024
     backend: str = "default"
@@ -42,6 +43,13 @@ class GenerateBody(BaseModel):
 class ExpandBody(BaseModel):
     direction: str = "north"
     prompt: str = ""
+
+
+class EditBody(BaseModel):
+    aabb_min: tuple[float, float, float]
+    aabb_max: tuple[float, float, float]
+    delete: bool = True
+    style: str = ""
 
 
 def create_app(
@@ -81,9 +89,22 @@ def create_app(
             backend=body.backend,
         )
 
+        layout = body.layout
+
         def _job(progress: ProgressCb) -> str:
             pipeline = Pipeline(settings=settings, profiler=Profiler(), progress=progress)
-            pipeline.generate(req, out_dir)
+            if layout is not None:
+                from adamworld.world.schema import Layout
+
+                pipeline.generate_from_layout(
+                    Layout.model_validate(layout),
+                    out_dir,
+                    backend=body.backend if body.backend != "default" else "mock",
+                    resolution=body.resolution,
+                    seed=body.seed,
+                )
+            else:
+                pipeline.generate(req, out_dir)
             return world_id
 
         job_id = queue.submit(_job)
@@ -145,8 +166,18 @@ def create_app(
         return {"job_id": queue.submit(_job), "world_id": world_id}
 
     @app.post("/worlds/{world_id}/edit")
-    def edit_world(world_id: str) -> dict:
-        raise HTTPException(501, "editing lands in M5")
+    def edit_world(world_id: str, body: EditBody) -> dict:
+        from adamworld.world import World
+
+        d = world_dir(world_id)
+        if not (d / "world.json").exists():
+            raise HTTPException(404, "world not found")
+        if not body.delete:
+            raise HTTPException(501, "region regeneration (GPU) is not available here; use delete")
+        Pipeline(settings=settings).edit_region(
+            World.load(d), body.aabb_min, body.aabb_max, delete=True
+        )
+        return {"world_id": world_id, "status": "edited"}
 
     return app
 

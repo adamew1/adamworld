@@ -36,9 +36,22 @@ def generate(
     offload: bool = typer.Option(False, help="Enable CPU offload / sequential loading."),
     profile: bool = typer.Option(False, help="Print per-stage time + peak VRAM."),
     force: bool = typer.Option(False, help="Ignore cache and recompute."),
+    layout: Path = typer.Option(None, "--layout", help="Block-out layout JSON (stage 8)."),
 ) -> None:
+    if layout is not None:
+        from adamworld.world.schema import Layout
+
+        lay = Layout.model_validate_json(Path(layout).read_text(encoding="utf-8-sig"))
+        pipe = Pipeline(settings=Settings(offload=offload))
+        world = pipe.generate_from_layout(
+            lay, out, backend=backend, resolution=resolution, seed=seed
+        )
+        console.print(
+            f"[green]Done[/green] layout world at {world.root} ({len(lay.blocks)} blocks)"
+        )
+        return
     if not prompt and not image and not panorama:
-        raise typer.BadParameter("Provide --prompt, --image, or --panorama.")
+        raise typer.BadParameter("Provide --prompt, --image, --panorama, or --layout.")
     req = GenerationRequest(
         prompt=prompt,
         image_paths=list(image or []),
@@ -125,13 +138,24 @@ def expand(
 @app.command()
 def edit(
     world: Path = typer.Argument(...),
-    region: str = typer.Option(None, help="x0,y0,z0,x1,y1,z1 AABB."),
-    regenerate: bool = typer.Option(False),
-    delete: bool = typer.Option(False),
+    region: str = typer.Option(..., help="x0,y0,z0,x1,y1,z1 AABB."),
+    regenerate: bool = typer.Option(False, help="Regenerate the region (GPU)."),
+    delete: bool = typer.Option(False, help="Delete splats in the region."),
     style: str = typer.Option("", help="Style prompt for regeneration."),
 ) -> None:
-    console.print("[yellow]Region editing lands in M5.[/yellow]")
-    raise typer.Exit(1)
+    from adamworld.splat import GaussianCloud
+    from adamworld.world import World
+
+    vals = [float(x) for x in region.split(",")]
+    if len(vals) != 6:
+        raise typer.BadParameter("--region must be x0,y0,z0,x1,y1,z1")
+    lo = (min(vals[0], vals[3]), min(vals[1], vals[4]), min(vals[2], vals[5]))
+    hi = (max(vals[0], vals[3]), max(vals[1], vals[4]), max(vals[2], vals[5]))
+    w = World.load(world)
+    before = len(GaussianCloud.load_ply(w.splats_ply))
+    Pipeline().edit_region(w, lo, hi, delete=delete, regenerate=regenerate, style=style)
+    after = len(GaussianCloud.load_ply(w.splats_ply))
+    console.print(f"[green]Edited[/green] region: {before} -> {after} splats")
 
 
 @app.command()

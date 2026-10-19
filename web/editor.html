@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdamWorld — Layout Editor</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0d12; color: #e7eaf0;
+        font-family: system-ui, sans-serif; overflow: hidden; }
+      #app { position: fixed; inset: 0; }
+      #panel { position: fixed; top: 12px; left: 12px; width: 230px; padding: 12px;
+        background: rgba(20,24,33,0.9); border: 1px solid #2a3344; border-radius: 10px;
+        font-size: 13px; }
+      #panel h1 { font-size: 14px; margin: 0 0 8px; }
+      #panel button { display: inline-block; margin: 2px; padding: 5px 8px; cursor: pointer;
+        background: #1e2838; color: #e7eaf0; border: 1px solid #39465c; border-radius: 6px; }
+      #panel button:hover { background: #2a3850; }
+      #panel .row { margin: 6px 0; }
+      #panel input, #panel select { width: 100%; box-sizing: border-box; padding: 4px;
+        background: #11161f; color: #e7eaf0; border: 1px solid #39465c; border-radius: 6px; }
+      #gen { background: #2b5fd0 !important; border-color: #2b5fd0 !important; width: 100%; margin-top: 8px; }
+      #status { margin-top: 8px; opacity: 0.8; min-height: 16px; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="panel">
+      <h1>Block-out editor</h1>
+      <div class="row">
+        <button data-add="box">+ Box</button>
+        <button data-add="plane">+ Plane</button>
+        <button data-add="cylinder">+ Cylinder</button>
+      </div>
+      <div class="row">
+        <button data-mode="translate">Move</button>
+        <button data-mode="rotate">Rotate</button>
+        <button data-mode="scale">Scale</button>
+        <button id="del">Delete</button>
+      </div>
+      <div class="row">Label<input id="label" placeholder="wooden table" /></div>
+      <div class="row">Style prompt<input id="style" placeholder="an ancient stone hall" /></div>
+      <button id="gen">Generate world</button>
+      <div id="status">0 blocks</div>
+    </div>
+    <script type="module" src="/src/editor.ts"></script>
+  </body>
+</html>
