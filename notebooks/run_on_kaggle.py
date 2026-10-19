@@ -109,10 +109,40 @@ for off in (True, False):
         GenerationRequest(prompt='a quiet forest clearing',
                           image_paths=[Path(SEED_IMG)] if SEED_IMG else [],
                           resolution=768, backend='default', seed=0),
-        Path(f'/kaggle/working/bench_{off}'))
+        Path(f'/tmp/bench_{off}'))  # /tmp -> not in kernel output, keeps the download tiny
     print(prof.table(), flush=True)
     print('device used after run (MB, ~nvidia-smi):', round(_dev_used_mb(), 1), flush=True)
 print('OK bench done', flush=True)
+"""
+    return _PRELUDE + tail
+
+
+def _full_source() -> str:
+    """Comprehensive validation: image->world with the seamless pano (H5), gsplat
+    fit (H7), and occlusion fill (H6) all on. Reports splat count before/after fit
+    and the reserved-VRAM profile. Needs gsplat (installed here)."""
+    tail = """
+subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'gsplat'], check=True)
+import numpy as np, glob, shutil
+from adamworld.splat import GaussianCloud
+from adamworld.imaging import load_rgb
+
+req = GenerationRequest(prompt='a quiet forest clearing with a mossy stone well',
+                        image_paths=[Path(SEED_IMG)] if SEED_IMG else [],
+                        resolution=768, backend='default', seed=0)
+prof = Profiler()
+world = Pipeline(settings=Settings(offload=True), profiler=prof, occlusion=True,
+                 progress=lambda s, f: print(f'{f*100:5.1f}%  {s}', flush=True)).generate(
+    req, Path('/kaggle/working/world'))
+print(prof.table(), flush=True)
+
+pano = sorted(glob.glob('/kaggle/working/world/cache/panorama/*.png'))[0]
+depth = sorted(glob.glob('/kaggle/working/world/cache/depth/*.npy'))[0]
+before = GaussianCloud.from_rgbd_equirect(load_rgb(pano), np.load(depth), max_points=800000)
+after = GaussianCloud.load_ply('/kaggle/working/world/splats.ply')
+print(f'SPLATS unprojected(before fit): {len(before)}  ->  after fit+occlusion: {len(after)}', flush=True)
+shutil.make_archive('/kaggle/working/world', 'zip', '/kaggle/working/world')
+print('OK wrote world.zip', flush=True)
 """
     return _PRELUDE + tail
 
@@ -139,7 +169,7 @@ def _notebook(source: str) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["image", "text", "bench"], default="image")
+    ap.add_argument("--mode", choices=["image", "text", "bench", "full"], default="image")
     ap.add_argument("--poll", type=int, default=30, help="status poll interval (s)")
     args = ap.parse_args()
 
@@ -188,7 +218,10 @@ def main() -> None:
     if k_dir.exists():
         shutil.rmtree(k_dir)
     k_dir.mkdir(parents=True)
-    source = _bench_source() if args.mode == "bench" else _run_source(args.mode)
+    source = {
+        "bench": _bench_source,
+        "full": _full_source,
+    }.get(args.mode, lambda: _run_source(args.mode))()
     (k_dir / "adamworld-generate.ipynb").write_text(json.dumps(_notebook(source), indent=1))
     (k_dir / "kernel-metadata.json").write_text(json.dumps({
         "id": f"{user}/{KERNEL_SLUG}",
