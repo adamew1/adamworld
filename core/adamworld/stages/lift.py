@@ -58,5 +58,8 @@ class LiftStage(Stage):
         if ctx.settings.device != "cuda":
             # No GPU -> keep the unprojected cloud (still a valid, viewable world).
             return cloud
-        # M1: short gsplat optimization against the rendered equirect view(s).
-        return cloud
+        # Short gsplat optimization against views rendered from the panorama,
+        # turning one-splat-per-pixel into a fitted (and pruned) splat field.
+        from adamworld.splat.fit import fit_gaussians  # noqa: PLC0415
+
+        return fit_gaussians(cloud, rgb)
