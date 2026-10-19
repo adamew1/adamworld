@@ -1,3 +1,9 @@
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Generated demo assets dropped into public/ for local viewing
+public/*.ply
+public/*.spz
+public/*.jpg
+public/*.glb
