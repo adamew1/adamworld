@@ -58,5 +58,8 @@ here with its training-data provenance.
 
 - The original Inria 3DGS rasterizer (`diff-gaussian-rasterization`) is research-only
   and is **never** a dependency; all rasterization/fitting uses **gsplat** (Apache-2.0).
-- LucidDreamer / WonderWorld / SuGaR are read as **public papers only**; our
-  occlusion/expansion code is written from scratch (see `docs/PROGRESS.md` H2 audit).
+- **LucidDreamer** (luciddreamer-cvlab) is **CC-BY-NC-SA-4.0** and **WonderWorld**
+  publishes **no license** (all rights reserved). We used only their *papers*
+  (methods) — no repository code was read or copied; our stage 5 (occlusion) and
+  stage 6 (expansion) are original and run on gsplat/Depth Anything, not their
+  Inria-derived rasterizers or ZoeDepth. See the H2 audit in `docs/PROGRESS.md`.

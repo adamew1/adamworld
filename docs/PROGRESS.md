@@ -15,7 +15,7 @@ GPU runs; README GIFs.
 
 ## Pre-release hardening (H1–H8, in order)
 - **H1 License audit ✅** — Verified on model cards (2026-10-19): DAv2 **Small = apache-2.0**, **Base/Large/Giant = cc-by-nc-4.0** (earlier draft was wrong). Default is now **Small**; NC sizes gated behind `--allow-noncommercial` (`Settings.allow_noncommercial`), enforced before load (tested). SDXL + inpaint = OpenRAIL++-M; ControlNet-depth-sdxl = openrail++; FLUX.1-schnell = apache-2.0 — all recorded in `docs/LICENSES.md`. README now states "code Apache-2.0, models under their own licenses". 36 tests green.
-- **H2** Clean-room audit vs LucidDreamer — pending.
+- **H2 Clean-room audit ✅** — LucidDreamer (luciddreamer-cvlab) is **CC-BY-NC-SA-4.0** (NC + ShareAlike), not MIT as an earlier draft said; WonderWorld has **no license**. Audited `stages/occlusion.py` + `Pipeline.expand`: written from the *papers*, single-file, own `geometry`/`GaussianCloud`/loop/constants; use **gsplat** + **Depth Anything** (not their Inria-derived rasterizer or ZoeDepth); no shared identifiers or file structure → no copied code, nothing to rewrite. Tightened docstrings to name the papers + "no repo code used"; fixed the wrong MIT license in RESEARCH.md and LICENSES.md.
 - **H3** gitleaks over full history; ignore kaggle.json/.env — pending.
 - **H4** Profiler reserved-VRAM per stage (885 MB figure suspect); regen BENCHMARKS on T4 — pending.
 - **H5** Panorama seams (circular conv padding + latent roll) + pole cube-face inpaint; before/after — pending.

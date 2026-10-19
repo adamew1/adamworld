@@ -1,10 +1,12 @@
 """Stage 5 — Fill occlusions (inpaint + lift + refit loop).
 
-Clean-room reimplementation of the LucidDreamer "Dreaming + Alignment" loop on
-gsplat: render the current splats from novel viewpoints, detect holes (low
-coverage), SDXL-inpaint them, estimate depth, align it to the rendered depth of
-known geometry, lift the new pixels to Gaussians, and merge. Noticeably fewer
-holes when you walk around. GPU-only; ``mock`` is a no-op passthrough.
+Clean-room: this implements the *method* described in the LucidDreamer paper
+(Chung et al., arXiv:2311.13384) — render novel views, detect holes, inpaint,
+estimate + align depth, lift, merge, iterate — written from scratch. No code from
+the LucidDreamer repository (CC-BY-NC-SA-4.0) was read or used, and none of its
+dependencies (their Inria-derived rasterizer, ZoeDepth) are used: rendering is via
+gsplat (Apache-2.0), depth via Depth Anything V2, geometry via our ``geometry``
+module. GPU-only; ``mock`` is a no-op passthrough.
 """
 
 from __future__ import annotations
