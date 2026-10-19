@@ -21,6 +21,7 @@ from adamworld.config import Settings, default_settings
 from adamworld.imaging import load_rgb, resize, save_rgb, save_thumbnail
 from adamworld.models.registry import ModelRegistry
 from adamworld.profiling import OutOfMemoryError, Profiler, oom_message
+from adamworld.splat import GaussianCloud
 from adamworld.stages.base import Stage, StageContext
 from adamworld.stages.depth import DepthStage
 from adamworld.stages.lift import LiftStage
@@ -168,6 +169,7 @@ class Pipeline:
         # --- finalize world ------------------------------------------------
         self._emit("finalize", 0.92)
         shutil.copyfile(splats.path, world.splats_ply)
+        GaussianCloud.load_ply(world.splats_ply).save_spz(world.splats_spz)  # primary, Spark-native
         pano_rgb = load_rgb(panorama.path)
         save_thumbnail(world.thumbnail, pano_rgb)
 

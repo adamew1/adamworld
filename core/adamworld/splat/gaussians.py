@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 
 from adamworld.splat.ply_io import read_gaussian_ply, write_gaussian_ply
+from adamworld.splat.spz_io import write_spz
 from adamworld.types import Vec3
 
 
@@ -67,6 +68,9 @@ class GaussianCloud:
         return write_gaussian_ply(
             path, self.means, self.colors, self.opacity, self.scales, self.quats
         )
+
+    def save_spz(self, path: Path) -> int:
+        return write_spz(path, self.means, self.colors, self.opacity, self.scales, self.quats)
 
     @classmethod
     def load_ply(cls, path: Path) -> GaussianCloud:

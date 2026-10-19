@@ -75,12 +75,31 @@ def export(
     if format not in mapping:
         raise typer.BadParameter("format must be ply, spz, or glb")
     src = world / mapping[format]
+    if format == "glb" and not src.exists():
+        from adamworld.meshing import mesh_world
+        from adamworld.world import World
+
+        console.print("Building mesh.glb from cached depth ...")
+        ref = mesh_world(World.load(world))
+        console.print(f"  mesh: {ref.vertices} verts, {ref.faces} faces")
     if not src.exists():
-        console.print(f"[red]No {format} in {world}[/red] (spz/glb land in M6).")
+        console.print(f"[red]No {format} in {world}[/red]")
         raise typer.Exit(1)
     dst = out or Path(f"{world.name}.{format}")
     shutil.copyfile(src, dst)
     console.print(f"[green]Exported[/green] {dst}")
+
+
+@app.command()
+def mesh(
+    world: Path = typer.Argument(..., help="World directory."),
+    max_rows: int = typer.Option(96, help="Mesh grid resolution (rows)."),
+) -> None:
+    from adamworld.meshing import mesh_world
+    from adamworld.world import World
+
+    ref = mesh_world(World.load(world), max_rows=max_rows)
+    console.print(f"[green]Wrote[/green] {ref.path}  ({ref.vertices} verts, {ref.faces} faces)")
 
 
 @app.command()

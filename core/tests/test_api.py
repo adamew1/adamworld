@@ -39,10 +39,12 @@ def test_generate_and_fetch_world(tmp_path: Path) -> None:
     # Asset + export download work.
     asset = client.get(f"/worlds/{world_id}/asset/splats.ply")
     assert asset.status_code == 200 and len(asset.content) > 0
-    exp = client.get(f"/worlds/{world_id}/export", params={"format": "ply"})
-    assert exp.status_code == 200
-    # spz not available until M6.
-    assert client.get(f"/worlds/{world_id}/export", params={"format": "spz"}).status_code == 404
+    assert client.get(f"/worlds/{world_id}/export", params={"format": "ply"}).status_code == 200
+    # spz is the primary format (written alongside ply).
+    assert "splats.spz" in got["assets"]
+    assert client.get(f"/worlds/{world_id}/export", params={"format": "spz"}).status_code == 200
+    # glb (mesh) still unavailable until the mesh stage runs.
+    assert client.get(f"/worlds/{world_id}/export", params={"format": "glb"}).status_code == 404
 
 
 def test_unknown_job_and_world(tmp_path: Path) -> None:

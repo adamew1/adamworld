@@ -1,6 +1,10 @@
 # PROGRESS.md
 
-## Status: M0 ✅ · M1 ✅ · M2 ✅ — building M3 (text input + occlusion fill)
+## Status: M0 ✅ · M1 ✅ · M2 ✅ · M3a (text) ✅ · M6 ✅ — remaining: M3b (occlusion), M4, M5, run on Kaggle
+
+> Milestone order adjusted: did M6 (export) early because it's fully CPU-verifiable and completes the
+> primary `.spz` format + Blender/Unity export. M3a (FLUX text→image) is done; M3b (occlusion fill),
+> M4 (expansion), M5 (layout editor) remain. The real GPU stages await a Kaggle run (needs your token).
 
 ### Decisions (resolved)
 - **Name:** AdamWorld (`adamworld` package/CLI, `@adamworld/web`).
@@ -21,9 +25,13 @@
 
 - **M2 Web viewer:** Spark **v2.3.1** (`@sparkjsdev/spark`, verified) + three r0.180. `web/src/main.ts` loads a world's `.spz`/`.ply` via `SplatMesh` + `SparkRenderer`; `controls.ts` = WASD/arrows + mouse/touch drag-look + Space/C + Shift-sprint; WebXR via `VRButton`; loading progress bar; `?world=<id>` (API) or `?src=<url>` (direct). **Verified in a headless browser (Playwright):** loaded a generated world's PLY, no load errors, splats render (see `adamworld-m2-viewer.png`). Viewer needs no GPU.
 
-### Next — M3 (text input + occlusion fill)
-- Stage 1 FLUX.1-schnell (Apache) text→seed image (fp8 + sequential offload on T4).
-- Stage 5 occlusion fill: render novel views → detect holes → SDXL-inpaint → depth → lift → add Gaussians → refit (LucidDreamer loop, clean-room on gsplat). CPU-testable parts: novel-view hole detection + splat merge; model calls on T4.
+- **M3a Text input:** stage 1 default = FLUX.1-schnell (Apache), 4-step, bf16 + sequential offload (T4).
+- **M7 notebooks:** `kaggle_generate.ipynb`, `colab_generate.ipynb`, and `run_on_kaggle.py` (headless: package `core/` → push GPU kernel → poll → pull `world.zip`).
+- **M6 Export:** `splats.spz` (hand-written Niantic SPZ v2, **verified rendering in Spark**, ~15× smaller than PLY) + `splats.ply` + `mesh.glb` (equirect-depth environment mesh via a self-contained GLB writer). CLI `export --format ply|spz|glb` (glb builds from cache) + `mesh`. Guides: `docs/export/blender.md`, `unity.md`. Gates green (23 tests).
+
+### Next
+- **Run on Kaggle** (needs your `~/.kaggle/kaggle.json`): `python notebooks/run_on_kaggle.py --mode image` → validate real SDXL pano + Depth Anything + lift on a T4, then `--mode text` for FLUX.
+- **M3b Occlusion fill**, **M4 Persistence + expansion**, **M5 Layout editor** (browser, Playwright-verifiable).
 
 ### Known issues / notes
 - Global `%TEMP%\pytest-of-*` is permission-locked on this PC; `conftest.py` redirects temp root to project-local `.pytest_tmp`.
