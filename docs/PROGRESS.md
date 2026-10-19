@@ -17,11 +17,13 @@ GPU runs; README GIFs.
 - **H1 License audit ✅** — Verified on model cards (2026-10-19): DAv2 **Small = apache-2.0**, **Base/Large/Giant = cc-by-nc-4.0** (earlier draft was wrong). Default is now **Small**; NC sizes gated behind `--allow-noncommercial` (`Settings.allow_noncommercial`), enforced before load (tested). SDXL + inpaint = OpenRAIL++-M; ControlNet-depth-sdxl = openrail++; FLUX.1-schnell = apache-2.0 — all recorded in `docs/LICENSES.md`. README now states "code Apache-2.0, models under their own licenses". 36 tests green.
 - **H2 Clean-room audit ✅** — LucidDreamer (luciddreamer-cvlab) is **CC-BY-NC-SA-4.0** (NC + ShareAlike), not MIT as an earlier draft said; WonderWorld has **no license**. Audited `stages/occlusion.py` + `Pipeline.expand`: written from the *papers*, single-file, own `geometry`/`GaussianCloud`/loop/constants; use **gsplat** + **Depth Anything** (not their Inria-derived rasterizer or ZoeDepth); no shared identifiers or file structure → no copied code, nothing to rewrite. Tightened docstrings to name the papers + "no repo code used"; fixed the wrong MIT license in RESEARCH.md and LICENSES.md.
 - **H3 Secrets scan ✅** — gitleaks v8.30.1 over **full history (14 commits): no leaks**. Targeted pickaxe searches confirm the Kaggle token (`KGAT_…`), its fragment, `access_token`, `kaggle.json`, and `.env` were **never committed** (token lives only in `~/.kaggle/`, outside the repo). `.gitignore` now excludes `.env*`, `kaggle.json`, `access_token`, `*.pem/*.key/id_rsa*`; added a `gitleaks` CI job (full-history scan on every push/PR).
-- **H4** Profiler reserved-VRAM per stage (885 MB figure suspect); regen BENCHMARKS on T4 — pending.
-- **H5** Panorama seams (circular conv padding + latent roll) + pole cube-face inpaint; before/after — pending.
-- **H6** Validate occlusion + ControlNet + text→image on T4; SDXL=T4 text default, FLUX opt-in; mark unvalidated "experimental" — pending.
-- **H7** gsplat optimization pass over unprojected points; before/after count+quality — pending.
-- **H8** 6-world gallery + GitHub Pages viewer + README GIFs — pending.
+- **H4 code ✅, T4 regen pending** — profiler now reports **reserved** VRAM (honest footprint) with `reset_peak_memory_stats` before each stage. BENCHMARKS regen is queued on Kaggle (see note below).
+- **H5 code ✅, validation pending** — `pano_seams.py`: circular-padded UNet/VAE convs + latent rolling + cube-face pole inpaint, wired into the SDXL pano stage. Before/after needs a T4 run.
+- **H6 partial** — **SDXL is now the text→image default**, FLUX opt-in (`--text-model flux`). *Still to do:* wire ControlNet-depth layout path; validate occlusion + ControlNet + text on T4.
+- **H7 code ✅, validation pending** — `splat/fit.py`: short gsplat optimization of unprojected splats vs panorama views + pruning, wired into stage 4. Before/after count needs a T4 run.
+- **H8** 6-world gallery + GitHub Pages viewer + README GIFs — pending (needs a GitHub repo/auth).
+
+> **GPU-validation blocker (2026-10-19):** the Kaggle kernel for the H4–H7 validation is stuck **QUEUED** (free-tier GPU availability after ~6–7 kernels today), and long-running local pollers keep getting stopped in this environment. The validation code is committed and ready; it runs as soon as a GPU slot frees (or interactively via `notebooks/kaggle_generate.ipynb`).
 
 ### Decisions (resolved)
 - **Name:** AdamWorld (`adamworld` package/CLI, `@adamworld/web`).
