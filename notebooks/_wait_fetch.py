@@ -1,7 +1,8 @@
-"""Poll the adamworld-generate kernel until it finishes, then fetch its output.
+"""Poll the adamworld-generate kernel and fetch its output when it finishes.
 
-Separated from run_on_kaggle so it survives the pusher being stopped. Run:
-    PYTHONUTF8=1 python notebooks/_wait_fetch.py [out_subdir]
+Prints only when the status CHANGES (QUEUED -> RUNNING -> COMPLETE) so it can be
+driven by Monitor without spamming. On a terminal state it fetches the output and
+prints a DONE line. Run:  PYTHONUTF8=1 python notebooks/_wait_fetch.py [out_subdir]
 """
 
 from __future__ import annotations
@@ -15,20 +16,24 @@ from kaggle.api.kaggle_api_extended import KaggleApi
 
 KREF = "adamlahchimi/adamworld-generate"
 OUT = os.path.join(".kaggle_run", sys.argv[1] if len(sys.argv) > 1 else "full")
+TERMINAL = ("complete", "error", "cancel")
 
 
 def main() -> None:
     api = KaggleApi()
     api.authenticate()
-    for _ in range(80):  # ~40 min max
+    last = ""
+    for _ in range(140):  # ~35 min at 15s
         try:
             s = str(api.kernels_status(KREF))
         except Exception as exc:
             s = f"(status error: {exc})"
-        print("status", s, flush=True)
-        if any(k in s.lower() for k in ("complete", "error", "cancel")):
+        if s != last:
+            print("status:", s, flush=True)
+            last = s
+        if any(k in s.lower() for k in TERMINAL):
             break
-        time.sleep(30)
+        time.sleep(15)
 
     shutil.rmtree(OUT, ignore_errors=True)
     os.makedirs(OUT, exist_ok=True)

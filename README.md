@@ -7,6 +7,14 @@ AdamWorld is a free and open alternative to tools like Marble. It is an independ
 > **Status: v0.1.0 — code-complete.** Milestones M0–M6 are implemented (see `docs/PROGRESS.md`). Everything runs on CPU with the `mock` backend (and is exercised by the test suite + a headless-browser viewer/editor check); the real GPU models run on a free Kaggle/Colab T4 via `notebooks/`. GIFs are captured from a T4 run.
 >
 > _(GIFs: run `notebooks/kaggle_generate.ipynb`, then drop `docs/media/*.gif` here.)_
+>
+> **Validated on a free T4:** image→world end to end, the reserved-VRAM profiler,
+> the occlusion loop, and the gsplat fit pass all run. **Experimental / not yet
+> good:** the SDXL equirectangular panorama is low quality (SDXL isn't pano-aware —
+> expect seams/soft poles/dark regions); the ControlNet layout path and the
+> FLUX/`flux-pano` backends are authored but not yet T4-validated. For real 360
+> fidelity use `--backend flux-pano` (non-commercial) or a FLUX.1-schnell pano LoRA
+> (roadmap). See `docs/BENCHMARKS.md` + `docs/RESEARCH.md`.
 
 ## What it does
 

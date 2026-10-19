@@ -19,6 +19,7 @@ from adamworld.config import Settings
 FLUX_SCHNELL_REPO = "black-forest-labs/FLUX.1-schnell"  # Apache-2.0
 SDXL_BASE_REPO = "stabilityai/stable-diffusion-xl-base-1.0"  # OpenRAIL++ (flagged default)
 SDXL_INPAINT_REPO = "diffusers/stable-diffusion-xl-1.0-inpainting-0.1"  # OpenRAIL++
+CONTROLNET_DEPTH_SDXL = "diffusers/controlnet-depth-sdxl-1.0"  # openrail++
 # Depth Anything V2: ONLY Small is Apache-2.0; Base/Large/Giant are CC-BY-NC-4.0.
 DEPTH_ANYTHING_V2 = {
     "small": "depth-anything/Depth-Anything-V2-Small-hf",

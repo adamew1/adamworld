@@ -138,5 +138,10 @@ class PanoramaStage(Stage):
         finally:
             pano_seams.unpatch_circular_conv(saved)
 
-        # Fix the poles (top/bottom cube faces).
-        return pano_seams.inpaint_poles(out, pipe, prompt)
+        # NOTE: cube-face pole inpainting (pano_seams.inpaint_poles) was validated on
+        # a T4 and made results WORSE — it left circular artifacts at the poles —
+        # so it is disabled. The circular-conv wrap is kept (harmless, helps the
+        # left/right seam). The real fix for poles/overall 360 quality is a
+        # pano-native model (flux-pano / a pano LoRA), not patching SDXL. The
+        # SDXL equirect panorama is EXPERIMENTAL; see docs/RESEARCH.md + BENCHMARKS.
+        return out
