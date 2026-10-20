@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdamWorld — Gallery</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; background: #0b0d12; color: #e7eaf0;
+        font-family: system-ui, sans-serif; }
+      header { padding: 28px 24px 8px; }
+      header h1 { margin: 0; font-size: 22px; }
+      header p { margin: 6px 0 0; opacity: 0.7; font-size: 14px; max-width: 640px; }
+      header a { color: #6ea8fe; }
+      #grid { display: grid; gap: 16px; padding: 20px 24px 48px;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+      .card { background: #141924; border: 1px solid #263044; border-radius: 12px;
+        overflow: hidden; text-decoration: none; color: inherit; transition: border-color .15s; }
+      .card:hover { border-color: #6ea8fe; }
+      .card img { display: block; width: 100%; aspect-ratio: 2/1; object-fit: cover; background: #0b0d12; }
+      .card .meta { padding: 10px 12px; }
+      .card .name { font-size: 14px; font-weight: 600; }
+      .card .sub { font-size: 12px; opacity: 0.6; margin-top: 2px; }
+      #empty { padding: 24px; opacity: 0.6; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>AdamWorld — Gallery</h1>
+      <p>Explorable 3D worlds generated from a prompt or image. Click any card to
+        walk through it in the browser (WASD / drag / touch; no GPU needed). Built
+        with <a href="https://github.com/sparkjsdev/spark">Spark</a> + three.js.</p>
+    </header>
+    <div id="grid"></div>
+    <div id="empty" hidden>No worlds yet — add entries to <code>gallery/worlds.json</code>.</div>
+    <script type="module" src="/src/gallery.ts"></script>
+  </body>
+</html>
