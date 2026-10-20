@@ -288,27 +288,100 @@ class Pipeline:
         )
         h = max(16, resolution // 2)
         w = h * 2
-        if backend != "mock":
-            raise NotImplementedError(
-                "Layout conditioning with ControlNet-depth (SDXL) runs on GPU; "
-                "use --backend mock for the CPU block-out preview."
+        if backend == "mock":
+            self._emit("layout", 0.3)
+            depth, label_id = rasterize_layout(layout, h, w)
+            thumb = layout_label_colors(layout, label_id)
+            cloud = GaussianCloud.from_rgbd_equirect(thumb, depth, max_points=400_000)
+            model_versions = {"layout": "mock-blockout@1"}
+        else:
+            # GPU: ControlNet-depth(SDXL) turns the block-out depth into a panorama
+            # that follows the layout, then stages 3-4 lift it. (EXPERIMENTAL — shares
+            # the SDXL pano quality limitation; see README.)
+            ctx = StageContext(
+                world=world,
+                settings=self.settings,
+                profiler=self.profiler,
+                seed=seed,
+                resolution=resolution,
+                backend=backend,
+                registry=ModelRegistry(self.settings),
+                force=self.force,
             )
-        self._emit("layout", 0.3)
-        depth, label_id = rasterize_layout(layout, h, w)
-        rgb = layout_label_colors(layout, label_id)
-        cloud = GaussianCloud.from_rgbd_equirect(rgb, depth, max_points=400_000)
+            self._emit("layout", 0.2)
+            panorama = self._controlnet_pano(ctx, layout, h, w)
+            depth_stage, lift_stage = DepthStage(), LiftStage()
+            self._emit("depth", 0.55)
+            depth_ref = self._run_stage(
+                depth_stage,
+                ctx,
+                inputs=panorama,
+                out_cls=DepthRef,
+                extra={},
+                runner=lambda p: depth_stage.run(ctx, panorama=panorama, out_prefix=p),
+            )
+            self._emit("lift", 0.75)
+            splats = self._run_stage(
+                lift_stage,
+                ctx,
+                inputs=_merge_refs(panorama, depth_ref),
+                out_cls=SplatRef,
+                extra={},
+                runner=lambda p: lift_stage.run(
+                    ctx, panorama=panorama, depth=depth_ref, out_prefix=p
+                ),
+            )
+            cloud = GaussianCloud.load_ply(splats.path)
+            thumb = load_rgb(panorama.path)
+            model_versions = {
+                "layout": "controlnet-depth-sdxl(OpenRAIL)",
+                "depth": depth_stage.model_version(ctx),
+                "lift": lift_stage.model_version(ctx),
+            }
 
         self._emit("finalize", 0.9)
         cloud.save_ply(world.splats_ply)
         cloud.save_spz(world.splats_spz)
-        save_thumbnail(world.thumbnail, rgb)
+        save_thumbnail(world.thumbnail, thumb)
         meta = world.meta()
         meta.layout = layout
-        meta.model_versions = {"layout": "mock-blockout@1"}
+        meta.model_versions = model_versions
         meta.bounds.aabb_min, meta.bounds.aabb_max = cloud.aabb()
         world.save_meta(meta)
         self._emit("done", 1.0)
         return world
+
+    def _controlnet_pano(self, ctx: StageContext, layout: Layout, h: int, w: int) -> PanoramaRef:
+        """Generate an equirect panorama conditioned on the layout's depth."""
+        from PIL import Image
+
+        from adamworld import pano_seams
+        from adamworld.layout_raster import rasterize_layout
+
+        depth, _ = rasterize_layout(layout, h, w)
+        valid = depth > 0
+        far = float(depth[valid].max()) if valid.any() else 1.0
+        d = np.where(valid, depth, far)
+        norm = 1.0 - (d - d.min()) / (d.max() - d.min() + 1e-6)  # near = bright
+        control = np.repeat((norm * 255).astype(np.uint8)[..., None], 3, axis=2)
+
+        pipe = ctx.get_registry().controlnet_depth_sdxl()
+        saved = pano_seams.patch_circular_conv(pipe.unet, pipe.vae)
+        try:
+            result = pipe(
+                prompt=layout.style_prompt or "a detailed 3d scene, equirectangular panorama",
+                image=Image.fromarray(control),
+                width=w,
+                height=h,
+                num_inference_steps=30,
+                controlnet_conditioning_scale=0.9,
+            )
+            out = np.asarray(result.images[0].convert("RGB"), dtype=np.uint8)
+        finally:
+            pano_seams.unpatch_circular_conv(saved)
+        path = ctx.world.cache_dir / "panorama" / "layout.png"
+        save_rgb(path, out)
+        return PanoramaRef(path=path, width=w, height=h, key="layout")
 
     def edit_region(
         self,

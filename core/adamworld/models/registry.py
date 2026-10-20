@@ -94,6 +94,33 @@ class ModelRegistry:
         self._loaded["sdxl_text"] = pipe
         return pipe
 
+    def controlnet_depth_sdxl(self) -> Any:  # noqa: ANN401
+        """SDXL + ControlNet-depth (both OpenRAIL++) for layout conditioning (stage 8)."""
+        _require_gpu_deps("ControlNet-depth SDXL (stage 8)")
+        if "controlnet_sdxl" in self._loaded:
+            return self._loaded["controlnet_sdxl"]
+        from diffusers import ControlNetModel, StableDiffusionXLControlNetPipeline  # noqa: PLC0415
+
+        cn = ControlNetModel.from_pretrained(
+            CONTROLNET_DEPTH_SDXL, torch_dtype=self._torch_dtype(), cache_dir=self.weights_path()
+        )
+        pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
+            SDXL_BASE_REPO,
+            controlnet=cn,
+            torch_dtype=self._torch_dtype(),
+            variant="fp16",
+            use_safetensors=True,
+            cache_dir=self.weights_path(),
+        )
+        if self.settings.offload:
+            pipe.enable_sequential_cpu_offload()
+        else:
+            pipe.to("cuda")
+        pipe.enable_vae_tiling()
+        pipe.set_progress_bar_config(disable=True)
+        self._loaded["controlnet_sdxl"] = pipe
+        return pipe
+
     def flux_schnell(self) -> Any:  # noqa: ANN401 - diffusers pipeline
         """FLUX.1-schnell (Apache-2.0), bf16 + sequential CPU offload to fit a T4."""
         _require_gpu_deps("FLUX.1-schnell (stage 1 default)")
