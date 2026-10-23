@@ -28,16 +28,17 @@ def fit_gaussians(
     fov_deg: float = 90.0,
     prune_opacity: float = 0.05,
 ) -> GaussianCloud:
-    """Return a fitted (and pruned) GaussianCloud. Falls back to ``cloud`` on any
-    error or if gsplat/torch is unavailable."""
+    """Fit and prune splats; raise on missing dependencies or fitting failures."""
     try:
         import torch
         from gsplat import rasterization
 
         from adamworld import geometry
         from adamworld.splat.render import _viewmat
-    except Exception:
-        return cloud
+    except ImportError as exc:
+        raise RuntimeError(
+            "Splat fitting requires torch and gsplat; install the GPU extra."
+        ) from exc
 
     if len(cloud) == 0:
         return cloud
@@ -113,4 +114,4 @@ def fit_gaussians(
             )
         return fitted if len(fitted) > 0 else cloud
     except Exception:
-        return cloud
+        raise

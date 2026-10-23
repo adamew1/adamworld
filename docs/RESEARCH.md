@@ -1,7 +1,9 @@
+> Historical design document. Implementation status and limitations are maintained in [README](../README.md) and [VERIFICATION](VERIFICATION.md); planned capabilities below are not release claims.
+
 # RESEARCH.md — model & library survey
 
 > Working project name: **AdamWorld** (provisional — see PLAN.md §0).
-> An open alternative to tools like Marble. Clean-room; composes existing open models.
+> An independent 3D scene research prototype. Clean-room; composes existing open models.
 > Research date: **2026-10-18**. All licenses verified against primary sources on this date; marked `(verify at adoption)` where the source was secondary. Re-check before any weights are downloaded.
 
 Target runtime for every **default** path: one NVIDIA **T4 / P100, ~16 GB VRAM**, single GPU, 9–12 h sessions. Anything needing 24–80 GB goes behind `--backend large` and is documented as rented-GPU only.
@@ -106,7 +108,7 @@ Coarse 3D blocks from the browser block-out editor (boxes/planes/cylinders + tex
 
 ## Viewer — Spark (confirmed)
 
-- **License: MIT** ✅ (World Labs). Compatible with Apache-2.0; permits commercial use. **Use it.**
+- **License: MIT** ✅ (upstream project). Compatible with Apache-2.0; permits commercial use. **Use it.**
 - **Package:** `@sparkjsdev/spark` on npm (also CDN); site `sparkjs.dev`; repo `github.com/sparkjsdev/spark` (renamed from "Forge" in 2025 — avoid stale "forge" refs).
 - **three.js:** requires **r180+**. Runs in any WebGL2 browser — desktop, mobile, headset (WebXR). **No GPU required**, satisfying "viewer must work on a laptop with no GPU."
 - **API surface we rely on:** `SplatMesh` (loads a splat asset as a three.js object) and `PackedSplats` (in-memory splat buffers for our dynamic edits/expansion). Confirm exact signatures against the docs during M2 before coding.

@@ -1,3 +1,11 @@
+# Publication audit - 2026-10-23
+
+Current status: pre-alpha research prototype. Earlier milestone completion claims below are historical and are superseded by README.md and VERIFICATION.md. H5 is unresolved; H6 is partially validated; H7 has no established quality gain; H8 is a mock gallery scaffold, not a released showcase.
+
+Publication preparation: corrected claims, removed silent fitting fallback, fixed layout backend selection, raised Python minimum, tightened npm CI. Fresh checks: 37 CPU tests passed, mypy passed, web lint/build passed; formatting issues corrected. Gitleaks 8.30.1 scanned all 24 commits with no leaks. The layout backend regression test passes. Authenticated GitHub account: adamew1. Public push is authorized and pending final checks.
+
+---
+
 # PROGRESS.md
 
 ## Status: v0.1.0 — M0–M7 ✅ and **default pipeline validated on a real free Kaggle T4**.

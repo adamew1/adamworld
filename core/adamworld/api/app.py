@@ -99,7 +99,7 @@ def create_app(
                 pipeline.generate_from_layout(
                     Layout.model_validate(layout),
                     out_dir,
-                    backend=body.backend if body.backend != "default" else "mock",
+                    backend=body.backend,
                     resolution=body.resolution,
                     seed=body.seed,
                 )

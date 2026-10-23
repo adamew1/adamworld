@@ -80,3 +80,19 @@ def test_layout_generate_and_region_delete(tmp_path: Path) -> None:
         json={"aabb_min": [-50, -50, -50], "aabb_max": [50, 50, 50], "delete": True},
     )
     assert edit.status_code == 200
+
+
+def test_layout_api_honors_default_backend(tmp_path: Path, monkeypatch) -> None:
+    from adamworld.pipeline import Pipeline
+
+    observed = []
+
+    def generate(self, layout, out_dir, **kwargs):
+        observed.append(kwargs["backend"])
+
+    monkeypatch.setattr(Pipeline, "generate_from_layout", generate)
+    client = TestClient(create_app(worlds_root=tmp_path / "worlds"))
+    response = client.post("/worlds", json={"layout": {"blocks": [], "style_prompt": "hall"}})
+    assert response.status_code == 200
+    assert _wait_done(client, response.json()["job_id"])["status"] == "done"
+    assert observed == ["default"]

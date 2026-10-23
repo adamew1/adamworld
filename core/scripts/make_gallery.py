@@ -42,7 +42,9 @@ def main() -> None:
     for i, (wid, prompt) in enumerate(WORLDS):
         print(f"[{i + 1}/{len(WORLDS)}] {wid}: {prompt}", flush=True)
         world = Pipeline(profiler=Profiler()).generate(
-            GenerationRequest(prompt=prompt, resolution=args.resolution, backend=args.backend, seed=i),
+            GenerationRequest(
+                prompt=prompt, resolution=args.resolution, backend=args.backend, seed=i
+            ),
             REPO / "worlds" / f"gal_{wid}",
         )
         dst = GALLERY / wid

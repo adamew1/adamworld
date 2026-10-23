@@ -1,120 +1,84 @@
 # AdamWorld
 
-**Turn a text prompt or an image into a persistent, explorable, editable 3D world** — walk through it in your browser, edit it, and export it to Blender or Unity.
+A personal research prototype for turning images into explorable Gaussian-splat scenes.
 
-AdamWorld is a free and open alternative to tools like Marble. It is an independent, clean-room project that composes open-source models and open model weights into a reproducible pipeline. It is designed to run its default pipeline on a **single free-tier GPU (one 16 GB T4 / P100 on Kaggle or Colab)**.
+AdamWorld combines image generation, depth estimation, spherical projection, a browser viewer, and portable scene files. The engineering focus is the pipeline and tooling: cached stages, a CLI and job API, scene metadata, a block-out editor, and PLY/SPZ/GLB export. It composes existing models; it does not train a world model from scratch.
 
-> **Status: v0.1.0 — code-complete.** Milestones M0–M6 are implemented (see `docs/PROGRESS.md`). Everything runs on CPU with the `mock` backend (and is exercised by the test suite + a headless-browser viewer/editor check); the real GPU models run on a free Kaggle/Colab T4 via `notebooks/`. GIFs are captured from a T4 run.
->
-> _(GIFs: run `notebooks/kaggle_generate.ipynb`, then drop `docs/media/*.gif` here.)_
->
-> **Validated on a free T4:** image→world end to end, the reserved-VRAM profiler,
-> the occlusion loop, and the gsplat fit pass all run. **Experimental / not yet
-> good:** the SDXL equirectangular panorama is low quality (SDXL isn't pano-aware —
-> expect seams/soft poles/dark regions); the ControlNet layout path and the
-> FLUX/`flux-pano` backends are authored but not yet T4-validated. For real 360
-> fidelity use `--backend flux-pano` (non-commercial) or a FLUX.1-schnell pano LoRA
-> (roadmap). See `docs/BENCHMARKS.md` + `docs/RESEARCH.md`.
+**Status: experimental, pre-alpha.** The CPU demo is a synthetic test fixture, not AI-generated scenery. GPU experiments have produced viewable scenes, but panorama quality remains poor and several features are incomplete. This repository is a work in progress, not a production release.
 
-## What it does
+**Code Apache-2.0, models under their own licenses.** No model weights are included. See [licenses](docs/LICENSES.md).
 
-```
-prompt / image / 360° panorama / block-out layout
-        │
-        ▼  (pipeline of cached, swappable stages)
-  text→image → image→360° → depth → lift to 3D Gaussian splats
-             → fill occlusions → expand at edges → (optional) mesh
-        │
-        ▼
-   world/  (splats + metadata + versioned history)
-        │
-        ├── explore & edit in the browser (three.js + Spark, no GPU needed)
-        └── export to PLY / SPZ / GLB → Blender / Unity
-```
+## What works and what remains
 
-## Design principles
+| Area | Current implementation | Limitation |
+| --- | --- | --- |
+| Image to scene | SDXL inpainting, relative depth, RGB-D unprojection | Seams, dark regions and distorted poles; depth is not calibrated metric depth |
+| Splat refinement | Short gsplat photometric fit | Quality improvement is not established by the existing logs |
+| Viewer | three.js + Spark, keyboard/mouse controls, touch look, WebXR entry | Requires WebGL2; hardware/browser support varies |
+| Editing | Block-out editor and region deletion | Region regeneration is not implemented |
+| Expansion | Generate, translate and concatenate a region | No demonstrated consistent boundary alignment |
+| Persistence | Metadata, cached outputs and edit records | Not a complete undo/restore system or bit-exact regeneration guarantee |
+| Export | Gaussian PLY/SPZ and coarse depth-grid GLB | GLB is an approximate surface, not a production mesh |
+| GPU text/layout | SDXL text generation and ControlNet layout path | Experimental; dedicated T4 validation remains pending |
+| Gallery | Static card grid and viewer links | Six mock fixtures only; no curated generated-world showcase yet |
 
-- **Clean-room & license-clean.** Only public papers, open code, and open weights. Default pipeline is Apache-2.0-compatible; any non-commercial model is an optional, clearly-flagged backend. See `docs/LICENSES.md`.
-- **Fits free hardware.** Every default stage runs within ~16 GB VRAM via fp16/fp8, CPU offload, tiling, and sequential model loading. Bigger models live behind `--backend large`.
-- **Reproducible.** Worlds carry their seed, parameters, and model versions in `world.json`, so a world can be regenerated from its metadata.
-- **Resumable.** Every stage caches its output by content hash; a crashed or cut-off run resumes instead of restarting.
-- **Viewer needs no GPU.** Only generation needs a GPU; exploring a finished world runs on any laptop.
+The previous local v0.1.0 tag is a development checkpoint, not evidence of release readiness. See the [verification report](docs/VERIFICATION.md) and [progress](docs/PROGRESS.md).
 
-## Quickstart (dev, CPU)
+## Try the CPU demo
+
+Use Python 3.11 or 3.12 and Node.js 20+. From the repository root:
 
 ```bash
-# Python core (CPU — mock backends, for development & tests)
+python -m venv .venv
+# Linux/macOS:
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e "./core[dev]"
+adamworld generate --prompt "a forest clearing" --backend mock --resolution 256 --out worlds/demo
+```
+
+To view the synthetic scene, copy `worlds/demo/splats.spz` to `web/public/demo.spz` (create `public` if needed), then:
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173/?src=demo.spz`. The block-out editor is at `/editor.html`. In a second terminal at the repository root, run `adamworld serve --worlds worlds` for editor generation through the local API. Choose the mock backend for the CPU preview.
+
+The API is a local development service, without authentication. Keep it bound to localhost; it accepts local file paths and is not designed for public hosting.
+
+## Experimental GPU path
+
+On a CUDA machine with Python 3.11 or 3.12:
+
+```bash
+python -m pip install -e "./core[gpu]"
+adamworld generate --image photo.jpg --offload --resolution 768 --profile --out worlds/experiment
+```
+
+SDXL is the text-to-image default; Depth Anything V2 Small is the depth default. FLUX.1-schnell is an optional, unvalidated text backend. The advertised `flux-pano` and `large` alternatives in historical planning notes are not working quality upgrades. GPU dependency installation and native gsplat compilation are environment-dependent.
+
+[Kaggle and Colab notebooks](notebooks/) are experimental runners. The [benchmark notes](docs/BENCHMARKS.md) distinguish historical measurements from verified quality claims. Allocator-reserved memory is not total GPU memory usage.
+
+## Development
+
+```bash
 cd core
-python -m venv ../.venv && . ../.venv/Scripts/activate   # Windows: ..\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-pytest -q                          # runs the CPU smoke test
-adamworld generate --prompt "a quiet forest clearing" --backend mock --out ../worlds/demo
-adamworld serve                    # FastAPI backend on :8000
-
-# Web viewer
-cd ../web
-npm install
-npm run dev                        # viewer on :5173
+ruff check .
+ruff format --check .
+mypy adamworld
+pytest -q
+# In web/: npm run lint && npm run build
 ```
 
-GPU generation (real models) needs the `[gpu]` extra and a CUDA GPU:
+- [Architecture](docs/ARCHITECTURE.md)
+- [Model and library licenses](docs/LICENSES.md)
+- [Verification and limitations](docs/VERIFICATION.md)
+- [Blender export](docs/export/blender.md) / [Unity export](docs/export/unity.md)
+- [Contributing](CONTRIBUTING.md)
 
-```bash
-pip install -e ".[gpu]"
-adamworld generate --prompt "a quiet forest clearing" --out worlds/forest
-```
+## Research direction
 
-## Hardware
-
-| Path | GPU | Notes |
-|------|-----|-------|
-| Default pipeline | 1× **T4 / P100, ~16 GB** | fp8/fp16 + CPU offload + tiling; free Kaggle/Colab tier |
-| `--backend large` | 24–80 GB | rented GPU; higher-fidelity backends |
-| Viewer / editor | **none** | runs in any WebGL2 browser |
-
-## More commands
-
-```bash
-adamworld generate --image photo.jpg --out worlds/w     # image -> world
-adamworld generate --layout layout.json --backend mock  # block-out -> world (stage 8)
-adamworld expand   worlds/w --direction north --prompt "a cave mouth"
-adamworld edit     worlds/w --region -5,-5,-5,5,5,5 --delete
-adamworld export   worlds/w --format spz   # or ply | glb (mesh)
-adamworld mesh     worlds/w                # build mesh.glb from cached depth
-adamworld serve                            # API on :8000; web editor at /editor.html
-```
-
-## Models & licenses
-
-**The code is Apache-2.0. Models are downloaded at runtime and remain under their
-own licenses** — AdamWorld redistributes no weights. The default pipeline uses only
-Apache-2.0 and OpenRAIL(++) models; every non-commercial model is gated behind
-`--allow-noncommercial` and never runs by default. Exact per-model licenses
-(verified) are in `docs/LICENSES.md`.
-
-| Stage | Default model | License |
-|-------|---------------|---------|
-| Text → image | **SDXL base** (default) · FLUX.1-schnell (`--text-model flux`) | OpenRAIL++-M · apache-2.0 |
-| Image → 360° pano / inpaint | SDXL-inpaint (+ SDXL base) | OpenRAIL++-M (flagged default) |
-| Depth | **Depth Anything V2 Small** | **apache-2.0** |
-| Lift / render / refit | gsplat | **Apache-2.0** |
-| Mesh | TSDF/grid + our GLB writer | **MIT/Apache** |
-| Layout conditioning | ControlNet-depth-sdxl | openrail++ |
-| Viewer | Spark + three.js | **MIT** |
-| Splat file | SPZ (ours, Niantic format) / PLY | **MIT** |
-| opt-in (`--allow-noncommercial`) | DAv2 Base/Large/Giant (CC-BY-NC), FLUX.1-dev DiT360/Gimbal360, UniDepth, Depth Pro | non-commercial |
-
-## Documentation
-
-- `docs/PLAN.md` — architecture, modules, file formats, milestones
-- `docs/RESEARCH.md` — model/library survey & the reasons behind each default
-- `docs/LICENSES.md` — every model & dependency with its license
-- `docs/PROGRESS.md` — what's done, what's next, known issues
-- `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`
-
-## License
-
-**Code: Apache-2.0** (`LICENSE`). **Models: under their own licenses** — downloaded at
-runtime, never redistributed here; non-commercial models are opt-in only (see
-`docs/LICENSES.md`). "Marble" and "World Labs" are trademarks of their respective
-owners; AdamWorld is not affiliated with or derived from them.
+Improve panorama completion with controlled before/after evaluation; establish that hole filling actually executes and reduces disocclusions; measure fitting loss and held-out render quality; implement consistent expansion and region regeneration. These are open engineering and research tasks, not completed capabilities.

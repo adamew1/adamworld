@@ -1,3 +1,5 @@
+> Historical design document. Implementation status and limitations are maintained in [README](../README.md) and [VERIFICATION](VERIFICATION.md); planned capabilities below are not release claims.
+
 # ARCHITECTURE.md
 
 How the pieces fit together. See `PLAN.md` for the full module tree and the

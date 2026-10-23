@@ -1,6 +1,8 @@
+> Historical design document. Implementation status and limitations are maintained in [README](../README.md) and [VERIFICATION](VERIFICATION.md); planned capabilities below are not release claims.
+
 # PLAN.md — AdamWorld architecture & milestones
 
-> An open, independent alternative to tools like Marble. Clean-room; composes open models.
+> An independent 3D scene research prototype. Clean-room; composes open models.
 > License: **Apache-2.0**. Target default runtime: **1× T4/P100, ~16 GB**. See RESEARCH.md for model choices.
 
 ## 0. Decisions (resolved per build-prompt §6)

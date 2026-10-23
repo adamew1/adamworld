@@ -22,7 +22,7 @@ MAX_POINTS = 800_000
 
 class LiftStage(Stage):
     name = "lift"
-    version = "1"
+    version = "2"
 
     def run(
         self,
@@ -45,7 +45,7 @@ class LiftStage(Stage):
         return SplatRef(path=path, count=count, format="ply", aabb_min=lo, aabb_max=hi)
 
     def model_version(self, ctx: StageContext) -> str:
-        return "numpy-unproject@1" if ctx.backend == "mock" else "gsplat-refit@1"
+        return "numpy-unproject@1" if ctx.backend == "mock" else "gsplat-refit@2"
 
     # --- optional GPU refinement ------------------------------------------
     def _maybe_refine(
