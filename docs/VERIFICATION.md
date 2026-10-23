@@ -15,3 +15,5 @@ Outstanding: panorama quality, meaningful occlusion branch coverage, fitting qua
 Checks and publication outcome will be recorded in PROGRESS.md after execution.
 
 Local results: 37 CPU tests passed (one upstream deprecation warning); ruff lint and format passed; mypy passed for 37 source files; web ESLint and TypeScript/Vite build passed (bundle-size advisory). Full-history gitleaks found no leaks in 24 pre-audit commits. No new GPU validation or visual-quality claim is made.
+
+Publication: [adamew1/adamworld](https://github.com/adamew1/adamworld) is public. [Hosted CI run](https://github.com/adamew1/adamworld/actions/runs/39954703344) passed all three jobs for commit `62d7922` on 2026-10-23. No release tags or GitHub Pages showcase were published.
